@@ -289,23 +289,31 @@ module EX(
     
 //except
     wire [31:0] alu_src2_mux;
-    wire [31:0] result_sum;
+    wire [32:0] result_sum;
     wire ov_sum;
-    wire ovassert;
+    wire int_overflow_pos;
+    wire except_of_overflow;
+    wire except_of_addr;
     
-    assign alu_src2_mux = alu_op[9] ? (~alu_src2)+1 : alu_src2;
+    assign is_inst_mfc0 = excepttype_i[1];
+    assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
+                              (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0010) |  
+                              (inst[31:26]==6'b00_1000) ? 1'b1:1'b0;
+
+    assign alu_src2_mux = alu_op[10] ? (~alu_src2)+1 : alu_src2;
     assign result_sum = alu_src1 + alu_src2_mux;
-    assign ov_sum = ((!alu_src1[31]&&!alu_src2_mux[31])&&result_sum[31])||((alu_src1[31]&&alu_src2_mux[31])&&(!result_sum));
-    assign ovassert = (((alu_op[10] == 1'b1)||(alu_op[11] == 1'b1))&&ov_sum == 1'b1) ? 1'b1 : 1'b0;
+    assign ov_sum = ((!alu_src1[31]&&!alu_src2_mux[31])&&result_sum[31]) ||
+                    ((alu_src1[31]&&alu_src2_mux[31])&&(!result_sum[31]));
+
+    assign except_of_overflow = ((int_overflow_pos==1'b1) && (ov_sum == 1'b1)) ? 1'b1 : 1'b0;
     
-    assign excepttype_i[7] = ((inst_lw && data_sram_addr[1:0] != 2'b0) || 
+    assign except_of_addr = ((inst_lw && data_sram_addr[1:0] != 2'b0) || 
                              ((inst_lh||inst_lhu) && data_sram_addr[0] != 1'b0) ||
                              (inst_sw && data_sram_addr[1:0] !=2'b0) ||
                              (inst_sh && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
-    assign excepttype_i[6] = ovassert ? 1'b1 : 1'b0;
-    assign excepttype_o = excepttype_i;
-    assign is_in_delayslot_o = 1'b0;
-    assign is_inst_mfc0 = excepttype_i[1];
+
+    assign excepttype_o = {excepttype_i[13:8], except_of_addr, except_of_overflow, excepttype_i[5:0]};
+
 
     
 endmodule

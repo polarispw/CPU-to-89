@@ -103,7 +103,8 @@ module MEM(
     assign rf_wdata = sel_rf_res & data_ram_en ? mem_result : 
                       excepttype_i[1] ? cp0_rdata : ex_result;
 
-    assign mem_to_wb_bus = {
+    assign mem_to_wb_bus = to_be_flushed ? `MEM_TO_WB_WD'b0 :
+    {
         hilo_bus,   // 135:70
         mem_pc,     // 69:38
         rf_we,      // 37
