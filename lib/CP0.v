@@ -15,6 +15,8 @@ module CP0(
     reg [31:0] status;
     reg [31:0] cause;
     reg [31:0] EPC;
+    reg [31:0] compare;
+    reg [31:0] r_10010;
 
 
     wire is_in_delayslot;
@@ -33,8 +35,7 @@ module CP0(
             except_of_break, except_of_invalid_inst, inst_eret, inst_mfc0, inst_mtc0} 
             = excepttype;
 
-    wire except_happen = except_of_overflow | except_of_syscall |
-                         except_of_break;
+    wire except_happen = except_of_overflow | except_of_syscall | except_of_break;
 
     always @ (*) begin
         if (rst) begin
@@ -43,6 +44,8 @@ module CP0(
             status <= {9'b0,1'b1,22'b0};
             cause <= 32'b0;
             EPC <= 32'b0;
+            compare <= 32'b0;
+            r_10010 <= 32'b0;
         end
 
         else begin
@@ -62,6 +65,34 @@ module CP0(
                     end
                     5'b01_110:begin
                         cp0_rdata = EPC;
+                    end
+                    default:begin
+                        
+                    end
+                endcase
+            end 
+            else if (inst_mtc0) begin
+                case (target_addr)
+                    5'b01_000:begin
+                        badvaddr <= rt_rdata;
+                    end 
+                    5'b01_001:begin
+                        count <= rt_rdata;
+                    end
+                    5'b01_100:begin
+                        status <= {rt_rdata[31:23], 1'b1, rt_rdata[21:0]};
+                    end
+                    5'b01_101:begin
+                        cause <= rt_rdata;
+                    end
+                    5'b01_110:begin
+                        EPC <= rt_rdata;
+                    end
+                    5'b01_011:begin
+                        compare <= rt_rdata;
+                    end
+                    5'b10_010:begin
+                        r_10010 <= rt_rdata;
                     end
                     default:begin
                         
@@ -100,7 +131,7 @@ module CP0(
     end
     
     assign o_rdata = cp0_rdata;
-    assign new_pc = (status[1] ==1'b1) ? 32'hbfc00380 : EPC[31:0]+32'h4;
+    assign new_pc = (status[1] ==1'b1) ? 32'hbfc00380 : EPC[31:0];
     assign to_be_flushed = except_happen | inst_eret;
 
 endmodule

@@ -327,7 +327,7 @@ module ID(
 
 
     assign op_add = inst_add | inst_addi | inst_addiu | inst_addu | inst_jal | inst_sw | inst_lw | inst_bltzal | inst_bgezal
-                  | inst_jalr | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_mfc0;
+                  | inst_jalr | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_mtc0;
     assign op_sub = inst_subu | inst_sub;
     assign op_slt = inst_slt | inst_slti;
     assign op_sltu = inst_sltu | inst_sltiu;
