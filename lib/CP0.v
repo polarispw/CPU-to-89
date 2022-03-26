@@ -35,7 +35,7 @@ module CP0(
             except_of_break, except_of_invalid_inst, inst_eret, inst_mfc0, inst_mtc0} 
             = excepttype;
 
-    wire except_happen = except_of_overflow | except_of_syscall | except_of_break;
+    wire except_happen = except_of_overflow | except_of_syscall | except_of_break | except_of_addr;
 
     always @ (*) begin
         if (rst) begin
@@ -103,7 +103,7 @@ module CP0(
                 EPC <= is_in_delayslot ? current_pc-32'h4 : current_pc;
                 cause[31] <= is_in_delayslot ? 1'b1 : 1'b0;
                 status[1] <= 1'b1;
-                case (excepttype[7:3])
+                case (excepttype[7:3])//addr,overflow,syscall,break,invalid_inst
                     5'b100_00:begin
                         cause[`ExcCode] <= 5'h4;
                     end
