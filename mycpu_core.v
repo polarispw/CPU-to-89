@@ -32,13 +32,19 @@ module mycpu_core(
     wire [`WB_TO_RF_WD-1:0] wb_to_rf_bus;
     wire [`StallBus-1:0] stall;
     wire stallreq_for_load;
+    wire stallreq_for_cp0;
     wire stallreq_for_bru;
     wire stallreq_for_ex;
+    wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus;
+    wire [31:0] new_pc;
+    wire flush;
 
     IF u_IF(
     	.clk             (clk             ),
         .rst             (rst             ),
         .stall           (stall           ),
+        .flush           (flush           ),
+        .new_pc          (new_pc          ),   
         .br_bus          (br_bus          ),
         .if_to_id_bus    (if_to_id_bus    ),
         .inst_sram_en    (inst_sram_en    ),
@@ -51,8 +57,10 @@ module mycpu_core(
     ID u_ID(
     	.clk                (clk               ),
         .rst                (rst               ),
+        .flush              (flush             ),
         .stall              (stall             ),
         .stallreq_for_load  (stallreq_for_load ),
+        .stallreq_for_cp0   (stallreq_for_cp0  ),
         .stallreq_for_bru   (stallreq_for_bru  ),
         .if_to_id_bus       (if_to_id_bus      ),
         .inst_sram_rdata    (inst_sram_rdata   ),
@@ -66,6 +74,7 @@ module mycpu_core(
     EX u_EX(
     	.clk             (clk             ),
         .rst             (rst             ),
+        .flush           (flush           ),
         .stall           (stall           ),
         .stallreq_for_ex (stallreq_for_ex ),
         .id_to_ex_bus    (id_to_ex_bus    ),
@@ -80,16 +89,19 @@ module mycpu_core(
     MEM u_MEM(
     	.clk             (clk             ),
         .rst             (rst             ),
+        .flush           (flush           ),
         .stall           (stall           ),
         .ex_to_mem_bus   (ex_to_mem_bus   ),
         .data_sram_rdata (data_sram_rdata ),
         .mem_to_wb_bus   (mem_to_wb_bus   ),
-        .mem_to_rf_bus   (mem_to_rf_bus   )
+        .mem_to_rf_bus   (mem_to_rf_bus   ),
+        .CP0_to_ctrl_bus (CP0_to_ctrl_bus )
     );
     
     WB u_WB(
     	.clk               (clk               ),
         .rst               (rst               ),
+        .flush             (flush             ),
         .stall             (stall             ),
         .mem_to_wb_bus     (mem_to_wb_bus     ),
         .wb_to_rf_bus      (wb_to_rf_bus      ),
@@ -104,6 +116,10 @@ module mycpu_core(
         .stallreq_for_ex   (stallreq_for_ex   ),
         .stallreq_for_bru  (stallreq_for_bru  ),
         .stallreq_for_load (stallreq_for_load ),
+        .stallreq_for_cp0  (stallreq_for_cp0  ),
+        .CP0_to_ctrl_bus   (CP0_to_ctrl_bus   ), 
+        .new_pc            (new_pc            ),
+        .flush             (flush             ),  
         .stall             (stall             )
     );
     

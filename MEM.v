@@ -2,15 +2,15 @@
 module MEM(
     input wire clk,
     input wire rst,
-    // input wire flush,
+    input wire flush,
     input wire [`StallBus-1:0] stall,
 
     input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
     input wire [31:0] data_sram_rdata,
 
     output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus,
-    
-    output wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus
+    output wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
+    output wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus
 );
 
     reg [`EX_TO_MEM_WD-1:0] ex_to_mem_bus_r;
@@ -19,9 +19,9 @@ module MEM(
         if (rst) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
         end
-        // else if (flush) begin
-        //     ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
-        // end
+        else if (flush) begin
+            ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
+        end
         else if (stall[3]==`Stop && stall[4]==`NoStop) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
         end
@@ -42,8 +42,10 @@ module MEM(
     wire [31:0] mem_result;
     wire [`HILO_WD-1:0] hilo_bus;
     wire [7:0] mem_op;
+    wire [13:0] excepttype_i;
 
     assign {
+        excepttype_i,   // 164:151
         mem_op,         // 150:143
         hilo_bus,       // 142:77
         mem_pc,         // 76:45
@@ -83,10 +85,23 @@ module MEM(
                         inst_lh     ? {{16{h_data[15]}},h_data} :
                         inst_lhu    ? {{16{1'b0}},h_data} :
                         inst_lw     ? w_data : 32'b0; 
-    
 
+    wire [31:0] cp0_rdata;
+    wire [31:0] new_pc;
+    wire to_be_flushed;
+    CP0 u_CP0(
+        .rst            (rst          ),
+        .excepttype     (excepttype_i ),
+        .rt_rdata       (ex_result    ),
+        .current_pc     (mem_pc       ),
+        .o_rdata        (cp0_rdata    ),
+        .new_pc         (new_pc       ),
+        .to_be_flushed  (to_be_flushed)
+    );
+    assign CP0_to_ctrl_bus = {to_be_flushed, new_pc};
 
-    assign rf_wdata = sel_rf_res & data_ram_en ? mem_result : ex_result;
+    assign rf_wdata = sel_rf_res & data_ram_en ? mem_result : 
+                      excepttype_i[1] ? cp0_rdata : ex_result;
 
     assign mem_to_wb_bus = {
         hilo_bus,   // 135:70

@@ -2,7 +2,7 @@
 module EX(
     input wire clk,
     input wire rst,
-    // input wire flush,
+    input wire flush,
     input wire [`StallBus-1:0] stall,
     output wire stallreq_for_ex,
 
@@ -24,9 +24,9 @@ module EX(
         if (rst) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
         end
-        // else if (flush) begin
-        //     id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
-        // end
+        else if (flush) begin
+            id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
+        end
         else if (stall[2]==`Stop && stall[3]==`NoStop) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
         end
@@ -50,8 +50,12 @@ module EX(
     wire [31:0] hi_i, lo_i;
     wire [7:0] hilo_op;
     wire [7:0] mem_op;
+    wire [13:0] excepttype_i;
+    wire [13:0] excepttype_o;
+    wire is_inst_mfc0;
 
     assign {
+        excepttype_i,   // 249:236
         mem_op,         // 235:228
         hilo_op,        // 227:220
         hi_i, lo_i,     // 219:156
@@ -79,7 +83,8 @@ module EX(
     wire [31:0] alu_result, ex_result;
 
     assign alu_src1 = sel_alu_src1[1] ? ex_pc :
-                      sel_alu_src1[2] ? sa_zero_extend : rf_rdata1;
+                      sel_alu_src1[2] ? sa_zero_extend :
+                      excepttype_i[0] ? 32'b0 : rf_rdata1;
 
     assign alu_src2 = sel_alu_src2[1] ? imm_sign_extend :
                       sel_alu_src2[2] ? 32'd8 :
@@ -112,7 +117,7 @@ module EX(
                           inst_sh | inst_lh | inst_lhu ? {{2{byte_sel[2]}},{2{byte_sel[0]}}} :
                           inst_sw | inst_lw ? 4'b1111 : 4'b0000;
 
-    assign data_sram_en     = data_ram_en;
+    assign data_sram_en     = flush ? 1'b0 : data_ram_en;
     assign data_sram_wen    = {4{data_ram_wen}}&data_ram_sel;
     assign data_sram_addr   = ex_result;
     assign data_sram_wdata  = inst_sb ? {4{rf_rdata2[7:0]}} :
@@ -261,6 +266,7 @@ module EX(
                      : alu_result;
 
     assign ex_to_mem_bus = {
+        excepttype_o,   // 164:151    
         mem_op,         // 150:143
         hilo_bus,       // 142:77
         ex_pc,          // 76:45
@@ -274,13 +280,33 @@ module EX(
     };
 
     assign ex_to_rf_bus = {
+        is_inst_mfc0,
         hilo_bus,
         rf_we,
         rf_waddr,
         ex_result
     };
     
+//except
+    wire [31:0] alu_src2_mux;
+    wire [31:0] result_sum;
+    wire ov_sum;
+    wire ovassert;
     
+    assign alu_src2_mux = alu_op[9] ? (~alu_src2)+1 : alu_src2;
+    assign result_sum = alu_src1 + alu_src2_mux;
+    assign ov_sum = ((!alu_src1[31]&&!alu_src2_mux[31])&&result_sum[31])||((alu_src1[31]&&alu_src2_mux[31])&&(!result_sum));
+    assign ovassert = (((alu_op[10] == 1'b1)||(alu_op[11] == 1'b1))&&ov_sum == 1'b1) ? 1'b1 : 1'b0;
+    
+    assign excepttype_i[7] = ((inst_lw && data_sram_addr[1:0] != 2'b0) || 
+                             ((inst_lh||inst_lhu) && data_sram_addr[0] != 1'b0) ||
+                             (inst_sw && data_sram_addr[1:0] !=2'b0) ||
+                             (inst_sh && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
+    assign excepttype_i[6] = ovassert ? 1'b1 : 1'b0;
+    assign excepttype_o = excepttype_i;
+    assign is_in_delayslot_o = 1'b0;
+    assign is_inst_mfc0 = excepttype_i[1];
+
     
 endmodule
 

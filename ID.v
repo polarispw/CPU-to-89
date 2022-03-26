@@ -2,10 +2,11 @@
 module ID(
     input wire clk,
     input wire rst,
-    // input wire flush,
+    input wire flush,
     input wire [`StallBus-1:0] stall,
     
     output wire stallreq_for_load,
+    output wire stallreq_for_cp0,
     output wire stallreq_for_bru,
 
     input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
@@ -37,6 +38,7 @@ module ID(
 
     wire [31:0] hi_o, lo_o;
     wire [31:0] hi, lo;
+    wire last_inst_is_mfc0;
 
     reg flag;
     reg [31:0] buf_inst;
@@ -47,9 +49,9 @@ module ID(
             flag <= 1'b0;
             buf_inst <= 32'b0;
         end
-        // else if (flush) begin
-        //     ic_to_id_bus <= `IC_TO_ID_WD'b0;
-        // end
+        else if (flush) begin
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;
+        end
         else if (stall[1]==`Stop && stall[2]==`NoStop) begin
             if_to_id_bus_r <= `IF_TO_ID_WD'b0;
             flag <= 1'b0;
@@ -70,6 +72,7 @@ module ID(
         id_pc
     } = if_to_id_bus_r;
     assign {
+        last_inst_is_mfc0,
         ex_hi_we,
         ex_hi_i,
         ex_lo_we,
@@ -126,6 +129,9 @@ module ID(
 
     wire [31:0] rf_rdata1, rf_rdata2, rdata1, rdata2;
     wire [31:0] bru_rdata1, bru_rdata2;
+
+    wire inst_valid;
+    wire [13:0] excepttype;
 
     regfile u_regfile(
     	.clk    (clk    ),
@@ -199,7 +205,7 @@ module ID(
     wire op_add, op_sub, op_slt, op_sltu;
     wire op_and, op_nor, op_or, op_xor;
     wire op_sll, op_srl, op_sra, op_lui;
-
+//decoder
     decoder_6_64 u0_decoder_6_64(
     	.in  (opcode    ),
         .out (op_d      )
@@ -230,8 +236,7 @@ module ID(
         .out (sa_d      )
     );
     
-    
-
+//inst launch
     assign inst_add     = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0000];
     assign inst_addi    = op_d[6'b00_1000];
     assign inst_addu    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0001];
@@ -286,9 +291,11 @@ module ID(
     assign inst_sb      = op_d[6'b10_1000];
     assign inst_sh      = op_d[6'b10_1001];
     assign inst_sw      = op_d[6'b10_1011];
+    assign inst_eret    = op_d[6'b01_0000] & func_d[6'b01_1000];
     assign inst_mfc0    = op_d[6'b01_0000] & rs_d[5'b0_0000] & sa_d[5'b0_0000] & (inst[5:3]==3'b000);
     assign inst_mtc0    = op_d[6'b01_0000] & rs_d[5'b0_0100] & sa_d[5'b0_0000] & (inst[5:3]==3'b000);
 
+//data select
     // rs to reg1
     assign sel_alu_src1[0] = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
                            | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_addi | inst_sub 
@@ -304,7 +311,8 @@ module ID(
     
     // rt to reg2
     assign sel_alu_src2[0] = inst_add | inst_addu | inst_subu | inst_sll | inst_or | inst_xor | inst_sltu | inst_slt
-                           | inst_sub | inst_and | inst_nor | inst_sllv | inst_sra | inst_srav | inst_srl | inst_srlv;
+                           | inst_sub | inst_and | inst_nor | inst_sllv | inst_sra | inst_srav | inst_srl | inst_srlv
+                           | inst_mtc0;
     
     // imm_sign_extend to reg2
     assign sel_alu_src2[1] = inst_lui | inst_addiu | inst_sw | inst_lw | inst_slti | inst_sltiu | inst_addi | inst_lb
@@ -319,7 +327,7 @@ module ID(
 
 
     assign op_add = inst_add | inst_addi | inst_addiu | inst_addu | inst_jal | inst_sw | inst_lw | inst_bltzal | inst_bgezal
-                  | inst_jalr | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh;
+                  | inst_jalr | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_mfc0;
     assign op_sub = inst_subu | inst_sub;
     assign op_slt = inst_slt | inst_slti;
     assign op_sltu = inst_sltu | inst_sltiu;
@@ -346,6 +354,7 @@ module ID(
         inst_lw, inst_sb, inst_sh, inst_sw
     };
 
+//store select
     // load and store enable
     assign data_ram_en = inst_sw | inst_lw | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh;
 
@@ -364,7 +373,7 @@ module ID(
                  | inst_lw | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_add | inst_addi
                  | inst_sub | inst_and | inst_andi | inst_nor | inst_xori | inst_sllv | inst_sra | inst_srav
                  | inst_srl | inst_srlv | inst_bltzal | inst_bgezal | inst_jalr | inst_mflo | inst_mfhi
-                 | inst_lh | inst_lhu | inst_lb | inst_lbu;
+                 | inst_lh | inst_lhu | inst_lb | inst_lbu | inst_mfc0;
 
 
 
@@ -374,7 +383,7 @@ module ID(
                          | inst_mflo | inst_mfhi;
     // store in [rt] 
     assign sel_rf_dst[1] = inst_ori | inst_lui | inst_addiu | inst_lw | inst_slti | inst_sltiu | inst_addi | inst_andi
-                         | inst_xori | inst_lh | inst_lhu | inst_lb | inst_lbu;
+                         | inst_xori | inst_lh | inst_lhu | inst_lb | inst_lbu | inst_mfc0;
     // store in [31]
     assign sel_rf_dst[2] = inst_jal | inst_bltzal | inst_bgezal | inst_jalr;
 
@@ -382,8 +391,9 @@ module ID(
     assign rf_waddr = {5{sel_rf_dst[0]}} & rd 
                     | {5{sel_rf_dst[1]}} & rt
                     | {5{sel_rf_dst[2]}} & 32'd31;
-
+//output
     assign id_to_ex_bus = {
+        excepttype,     // 248:236
         mem_op,         // 235:228
         hilo_op,        // 227:220
         hi, lo,         // 219:156
@@ -401,7 +411,7 @@ module ID(
         rdata2          // 31:0
     };
 
-
+//branch&jump
     wire br_e;
     wire [31:0] br_addr;
     wire rs_eq_rt;
@@ -460,10 +470,57 @@ module ID(
                    : inst_jal   ? {id_pc[31:28],instr_index,2'b0} 
                    : inst_jalr  ? rdata1 : 32'b0;
 
+    wire next_inst_in_delayslot;
+    reg is_in_delayslot;
+    assign next_inst_in_delayslot = br_e ? 1'b1 : 1'b0;
+    always @ (posedge clk) begin
+        if (next_inst_in_delayslot) begin
+            is_in_delayslot <= 1'b1;
+        end
+        else begin
+            is_in_delayslot <= 1'b0;
+        end
+    end
+
     assign br_bus = {
         br_e,
         br_addr
     };
+    
+//except
+    wire delay_slot;
+    wire except_of_addr;
+    wire except_of_overflow;
+    wire except_of_syscall;
+    wire except_of_break;
+    wire except_of_invalid_inst;
+
+    assign inst_valid = inst_add|inst_addi|inst_addu|inst_addiu|
+                        inst_sub|inst_subu|inst_slt|inst_slti|  
+                        inst_sltu|inst_sltiu|inst_div|inst_divu|
+                        inst_mult|inst_multu|inst_and|inst_andi|  
+                        inst_lui|inst_nor|inst_or|inst_ori|
+                        inst_xor|inst_xori|inst_sll|inst_sllv|
+                        inst_sra|inst_srav|inst_srl|inst_srlv|
+                        inst_beq|inst_bne|inst_bgez|inst_bgtz|
+                        inst_blez|inst_bltz|inst_bltzal|inst_bgezal|
+                        inst_j|inst_jal|inst_jr|inst_jalr|  
+                        inst_mfhi|inst_mflo|inst_mthi|inst_mtlo|
+                        inst_lb|inst_lbu|inst_lh|inst_lhu|
+                        inst_lw|inst_sb|inst_sh|inst_sw|
+                        inst_break|inst_syscall|
+                        inst_eret|inst_mfc0|inst_mtc0;
+
+    assign stallreq_for_cp0 = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
+    assign delay_slot = is_in_delayslot;
+    assign except_of_addr = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
+    assign except_of_overflow = 1'b0;
+    assign except_of_syscall = inst_syscall;
+    assign except_of_break = inst_break;
+    assign except_of_invalid_inst = ~inst_valid;
+
+    assign excepttype = {inst[15:11], delay_slot, except_of_addr, except_of_overflow, inst_syscall, inst_break,
+                         except_of_invalid_inst, inst_eret, inst_mfc0, inst_mtc0};
     
 
 
