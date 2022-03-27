@@ -51,7 +51,7 @@ module EX(
     wire [7:0] hilo_op;
     wire [7:0] mem_op;
     wire [13:0] excepttype_i;
-    wire [13:0] excepttype_o;
+    wire [14:0] excepttype_o;
     wire is_inst_mfc0;
 
     assign {
@@ -266,7 +266,7 @@ module EX(
                      : alu_result;
 
     assign ex_to_mem_bus = {
-        excepttype_o,   // 164:151    
+        excepttype_o,   // 165:151    
         mem_op,         // 150:143
         hilo_bus,       // 142:77
         ex_pc,          // 76:45
@@ -293,7 +293,8 @@ module EX(
     wire ov_sum;
     wire int_overflow_pos;
     wire except_of_overflow;
-    wire except_of_addr;
+    wire adel;
+    wire ades;
     
     assign is_inst_mfc0 = excepttype_i[1];
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
@@ -307,12 +308,10 @@ module EX(
 
     assign except_of_overflow = ((int_overflow_pos==1'b1) && (ov_sum == 1'b1)) ? 1'b1 : 1'b0;
     
-    assign except_of_addr = ((inst_lw && data_sram_addr[1:0] != 2'b0) || 
-                             ((inst_lh||inst_lhu) && data_sram_addr[0] != 1'b0) ||
-                             (inst_sw && data_sram_addr[1:0] !=2'b0) ||
-                             (inst_sh && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
+    assign adel = ((inst_lw && data_sram_addr[1:0] != 2'b0) || ((inst_lh||inst_lhu) && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
+    assign ades = ((inst_sw && data_sram_addr[1:0] != 2'b0) || (inst_sh && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
 
-    assign excepttype_o = {excepttype_i[13:8], except_of_addr, except_of_overflow, excepttype_i[5:0]};
+    assign excepttype_o = {excepttype_i[13:8], ades, adel, except_of_overflow, excepttype_i[5:0]};
 
 
     
