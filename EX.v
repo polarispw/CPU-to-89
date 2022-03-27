@@ -53,6 +53,8 @@ module EX(
     wire [13:0] excepttype_i;
     wire [14:0] excepttype_o;
     wire is_inst_mfc0;
+    wire adel;
+    wire ades;
 
     assign {
         excepttype_i,   // 249:236
@@ -117,7 +119,7 @@ module EX(
                           inst_sh | inst_lh | inst_lhu ? {{2{byte_sel[2]}},{2{byte_sel[0]}}} :
                           inst_sw | inst_lw ? 4'b1111 : 4'b0000;
 
-    assign data_sram_en     = flush ? 1'b0 : data_ram_en;
+    assign data_sram_en     = flush | ades ? 1'b0 : data_ram_en;
     assign data_sram_wen    = {4{data_ram_wen}}&data_ram_sel;
     assign data_sram_addr   = ex_result;
     assign data_sram_wdata  = inst_sb ? {4{rf_rdata2[7:0]}} :
@@ -293,8 +295,6 @@ module EX(
     wire ov_sum;
     wire int_overflow_pos;
     wire except_of_overflow;
-    wire adel;
-    wire ades;
     
     assign is_inst_mfc0 = excepttype_i[1];
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
