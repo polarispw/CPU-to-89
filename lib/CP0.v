@@ -1,7 +1,7 @@
 `include "defines.vh"
 module CP0(
     input wire rst,
-    input wire [14:0] excepttype,
+    input wire [`EXCEPTTYPE_WD:0] excepttype,
     input wire [31:0] current_pc,
     input wire [31:0] rt_rdata,
     input wire [31:0] bad_addr,
@@ -12,15 +12,16 @@ module CP0(
 );
 
     reg [31:0] badvaddr;
-    reg [31:0] count;
+    reg [31:0] count;//$9
     reg [31:0] status;
     reg [31:0] cause;
     reg [31:0] EPC;
-    reg [31:0] compare;
-    reg [31:0] r_10010;
+    reg [31:0] compare;//$11
+    reg [31:0] r_10010;//$18
 
 
     wire is_in_delayslot;
+    wire except_of_pc_addr;
     wire adel;
     wire ades;
     wire except_of_overflow;
@@ -30,14 +31,15 @@ module CP0(
     wire inst_eret;
     wire inst_mfc0;
     wire inst_mtc0;
-    wire[4:0] target_addr;
+    wire [4:0] target_addr;
     reg [31:0] cp0_rdata;
 
-    assign {target_addr, is_in_delayslot, ades, adel, except_of_overflow, except_of_syscall, 
+    assign {target_addr, is_in_delayslot, except_of_pc_addr, ades, adel, except_of_overflow, except_of_syscall, 
             except_of_break, except_of_invalid_inst, inst_eret, inst_mfc0, inst_mtc0} 
             = excepttype;
 
-    wire except_happen = except_of_overflow | except_of_syscall | except_of_break | adel | ades;
+    wire except_happen = except_of_overflow | except_of_syscall | except_of_break |
+                         except_of_pc_addr  | adel | ades | except_of_invalid_inst;
 
     always @ (*) begin
         if (rst) begin
@@ -105,25 +107,29 @@ module CP0(
                 EPC <= is_in_delayslot ? current_pc-32'h4 : current_pc;
                 cause[31] <= is_in_delayslot ? 1'b1 : 1'b0;
                 status[1] <= 1'b1;
-                case (excepttype[8:3])//ades,adel,overflow,syscall,break,invalid_inst
-                    6'b100_000:begin
+                case (excepttype[9:3])//pc_addr,ades,adel,overflow,syscall,break,invalid_inst
+                    7'b100_0000:begin
+                        cause[`ExcCode] <= 5'h4;
+                        badvaddr <= current_pc; 
+                    end
+                    7'b010_0000:begin
                         cause[`ExcCode] <= 5'h5;
                         badvaddr <= bad_addr; 
                     end
-                    6'b010_000:begin
+                    7'b001_0000:begin
                         cause[`ExcCode] <= 5'h4;
                         badvaddr <= bad_addr; 
                     end
-                    6'b001_000:begin
+                    7'b000_1000:begin
                         cause[`ExcCode] <= 5'hc;
                     end
-                    6'b000_100:begin
+                    7'b000_0100:begin
                         cause[`ExcCode] <= 5'h8;
                     end
-                    6'b000_010:begin
+                    7'b000_0010:begin
                         cause[`ExcCode] <= 5'h9;
                     end
-                    6'b000_001:begin
+                    7'b000_0001:begin
                         cause[`ExcCode] <= 5'ha;
                     end
                     default:begin

@@ -131,7 +131,7 @@ module ID(
     wire [31:0] bru_rdata1, bru_rdata2;
 
     wire inst_valid;
-    wire [13:0] excepttype;
+    wire [`EXCEPTTYPE_WD:0] excepttype;
 
     regfile u_regfile(
     	.clk    (clk    ),
@@ -393,7 +393,7 @@ module ID(
                     | {5{sel_rf_dst[2]}} & 32'd31;
 //output
     assign id_to_ex_bus = {
-        excepttype,     // 248:236
+        excepttype,     // 251:236
         mem_op,         // 235:228
         hilo_op,        // 227:220
         hi, lo,         // 219:156
@@ -489,7 +489,9 @@ module ID(
     
 //except
     wire delay_slot;
-    wire except_of_addr;
+    wire except_of_pc_addr;
+    wire adel;
+    wire ades;
     wire except_of_overflow;
     wire except_of_syscall;
     wire except_of_break;
@@ -513,14 +515,16 @@ module ID(
 
     assign stallreq_for_cp0 = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
     assign delay_slot = is_in_delayslot;
-    assign except_of_addr = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
+    assign except_of_pc_addr = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
     assign except_of_overflow = 1'b0;
     assign except_of_syscall = inst_syscall;
     assign except_of_break = inst_break;
     assign except_of_invalid_inst = ~inst_valid;
 
-    assign excepttype = {inst[15:11], delay_slot, except_of_addr, except_of_overflow, inst_syscall, inst_break,
-                         except_of_invalid_inst, inst_eret, inst_mfc0, inst_mtc0};
+    assign excepttype = {inst[15:11], delay_slot,
+                         except_of_pc_addr, adel, ades, except_of_overflow, 
+                         inst_syscall, inst_break, except_of_invalid_inst,
+                         inst_eret, inst_mfc0, inst_mtc0};
     
 
 

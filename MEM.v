@@ -42,10 +42,10 @@ module MEM(
     wire [31:0] mem_result;
     wire [`HILO_WD-1:0] hilo_bus;
     wire [7:0] mem_op;
-    wire [14:0] excepttype_i;
+    wire [`EXCEPTTYPE_WD:0] excepttype_i;
 
     assign {
-        excepttype_i,   // 165:151
+        excepttype_i,   // 166:151
         mem_op,         // 150:143
         hilo_bus,       // 142:77
         mem_pc,         // 76:45
@@ -91,6 +91,7 @@ module MEM(
     wire to_be_flushed;
     CP0 u_CP0(
         .rst            (rst          ),
+        .clk            (clk          ),
         .excepttype     (excepttype_i ),
         .bad_addr       (ex_result    ),
         .rt_rdata       (ex_result    ),
