@@ -260,7 +260,7 @@ module ID(
     assign inst_xor     = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0110];
     assign inst_xori    = op_d[6'b00_1110];
     assign inst_sllv    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0100];
-    assign inst_sll     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0000];
+    assign inst_sll     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0000] & !((ce == 1'b0) && (id_pc == 32'b0));
     assign inst_srav    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0111];
     assign inst_sra     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0011];
     assign inst_srlv    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0110];
@@ -472,7 +472,9 @@ module ID(
 
     wire next_inst_in_delayslot;
     reg is_in_delayslot;
-    assign next_inst_in_delayslot = br_e ? 1'b1 : 1'b0;
+    assign next_inst_in_delayslot = inst_beq | inst_bne | inst_bgez | inst_bgtz |
+                                    inst_blez | inst_bltz | inst_bltzal | inst_bgezal |
+                                    inst_j | inst_jr | inst_jal | inst_jalr ? 1'b1 : 1'b0;
     always @ (posedge clk) begin
         if (next_inst_in_delayslot) begin
             is_in_delayslot <= 1'b1;
@@ -519,7 +521,7 @@ module ID(
     assign except_of_overflow = 1'b0;
     assign except_of_syscall = inst_syscall;
     assign except_of_break = inst_break;
-    assign except_of_invalid_inst = ~inst_valid;
+    assign except_of_invalid_inst = ~inst_valid & ce;
 
     assign excepttype = {inst[15:11], delay_slot,
                          except_of_pc_addr, adel, ades, except_of_overflow, 
