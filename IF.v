@@ -30,10 +30,10 @@ module IF(
 
     always @ (posedge clk) begin
         if (rst) begin
-            pc_reg <= 32'hbfbf_fffc;
+            pc_reg <= 32'hbfbf_fff8;
         end
         else if (stall[0]==`NoStop) begin
-            pc_reg <= next_pc;
+            pc_reg <= {next_pc[31:3],3'b0};
         end
     end
 
@@ -44,17 +44,21 @@ module IF(
         else if (stall[0]==`NoStop) begin
             ce_reg <= 1'b1;
         end
+        // else if (stall[0]==`Stop) begin
+        //     ce_reg <= 1'b0;
+        // end
     end
 
 
     assign next_pc = flush ? new_pc :
-                     br_e ? br_addr :  pc_reg + 32'h4;
+                     br_e ? br_addr :  pc_reg + 32'd8;
 
     
     assign inst_sram_en = ce_reg;
     assign inst_sram_wen = 4'b0;
     assign inst_sram_addr = pc_reg;
     assign inst_sram_wdata = 32'b0;
+
     assign if_to_id_bus = {
         ce_reg,
         pc_reg
