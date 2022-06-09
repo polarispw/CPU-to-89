@@ -1,5 +1,4 @@
-`define EXCEPTTYPE_WD 15
-
+`include "defines.vh"
 module decoder(
     input wire [31:0] inst_sram_rdata,
     input wire [31:0] id_pc,
@@ -377,7 +376,7 @@ module decoder(
         data_ram_wen,   // 7
         rf_we,          // 6
         rf_waddr,       // 5:1
-        sel_rf_res     // 0
+        sel_rf_res      // 0
     };
 
     assign inst_flag[0] = inst_div | inst_divu | inst_mult | inst_multu;

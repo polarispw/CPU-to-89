@@ -17,7 +17,7 @@
 `define ZeroWord 32'b0
 
 
-//除法div
+// div
 `define DivFree 2'b00
 `define DivByZero 2'b01
 `define DivOn 2'b10
@@ -29,3 +29,16 @@
 
 //CP0
 `define ExcCode 6:2
+
+//FIFO
+`define InstBufferSize 32           
+`define InstBufferSizeLog2 5            
+
+`define Valid    1'b1               
+`define Invalid   1'b0
+`define DualIssue       1'b1      
+`define SingleIssue     1'b0               
+`define ValidPrediction 1'b1
+`define InValidPrediction 1'b0
+`define InstBus 31:0
+`define InstAddrBus 31:0

@@ -44,14 +44,15 @@ module IF(
         else if (stall[0]==`NoStop) begin
             ce_reg <= 1'b1;
         end
-        // else if (stall[0]==`Stop) begin
-        //     ce_reg <= 1'b0;
-        // end
+        else if (stall[0]==`Stop) begin
+            ce_reg <= 1'b0;
+        end
     end
 
 
     assign next_pc = flush ? new_pc :
-                     br_e ? br_addr :  pc_reg + 32'd8;
+                    //  br_e ? br_addr : 
+                     pc_reg + 32'd8;
 
     
     assign inst_sram_en = ce_reg;

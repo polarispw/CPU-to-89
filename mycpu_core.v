@@ -35,6 +35,7 @@ module mycpu_core(
     wire stallreq_for_cp0;
     wire stallreq_for_bru;
     wire stallreq_for_ex;
+    wire stallreq_for_fifo;
     wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus;
     wire [31:0] new_pc;
     wire flush;
@@ -62,6 +63,7 @@ module mycpu_core(
         .stallreq_for_load  (stallreq_for_load ),
         .stallreq_for_cp0   (stallreq_for_cp0  ),
         .stallreq_for_bru   (stallreq_for_bru  ),
+        .stallreq_for_fifo  (stallreq_for_fifo ),
         .if_to_id_bus       (if_to_id_bus      ),
         .inst_sram_rdata    (inst_sram_rdata   ),
         .ex_to_rf_bus       (ex_to_rf_bus      ),
@@ -117,6 +119,7 @@ module mycpu_core(
         .stallreq_for_bru  (stallreq_for_bru  ),
         .stallreq_for_load (stallreq_for_load ),
         .stallreq_for_cp0  (stallreq_for_cp0  ),
+        .stallreq_for_fifo (stallreq_for_fifo ),
         .CP0_to_ctrl_bus   (CP0_to_ctrl_bus   ), 
         .new_pc            (new_pc            ),
         .flush             (flush             ),  

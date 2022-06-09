@@ -1,4 +1,4 @@
-`include "lib/defines.vh"
+`include "defines.vh"
 module hilo_reg(
     input wire clk,
     input wire rst,
