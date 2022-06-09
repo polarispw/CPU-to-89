@@ -13,8 +13,7 @@ module decoder(
     output wire [32:0] br_bus,
     output wire stallreq_for_load,
     output wire stallreq_for_cp0,
-    output wire stallreq_for_bru,
-    output wire stallreq_for_IF
+    output wire [2:0] inst_flag
 );
 
     wire [31:0] inst;
@@ -317,9 +316,9 @@ module decoder(
 
     wire next_inst_in_delayslot;
     reg is_in_delayslot;
-    assign next_inst_in_delayslot = inst_beq | inst_bne | inst_bgez | inst_bgtz |
+    assign next_inst_in_delayslot = inst_beq  | inst_bne  | inst_bgez   | inst_bgtz   |
                                     inst_blez | inst_bltz | inst_bltzal | inst_bgezal |
-                                    inst_j | inst_jr | inst_jal | inst_jalr ? 1'b1 : 1'b0;
+                                    inst_j    | inst_jr   | inst_jal    | inst_jalr   ? 1'b1 : 1'b0;
 
     assign br_bus = {
         br_e,
@@ -336,21 +335,21 @@ module decoder(
     wire except_of_break;
     wire except_of_invalid_inst;
 
-    assign inst_valid = inst_add|inst_addi|inst_addu|inst_addiu|
-                        inst_sub|inst_subu|inst_slt|inst_slti|  
-                        inst_sltu|inst_sltiu|inst_div|inst_divu|
-                        inst_mult|inst_multu|inst_and|inst_andi|  
-                        inst_lui|inst_nor|inst_or|inst_ori|
-                        inst_xor|inst_xori|inst_sll|inst_sllv|
-                        inst_sra|inst_srav|inst_srl|inst_srlv|
-                        inst_beq|inst_bne|inst_bgez|inst_bgtz|
-                        inst_blez|inst_bltz|inst_bltzal|inst_bgezal|
-                        inst_j|inst_jal|inst_jr|inst_jalr|  
-                        inst_mfhi|inst_mflo|inst_mthi|inst_mtlo|
-                        inst_lb|inst_lbu|inst_lh|inst_lhu|
-                        inst_lw|inst_sb|inst_sh|inst_sw|
+    assign inst_valid = inst_add  |inst_addi|inst_addu|inst_addiu|
+                        inst_sub  |inst_subu|inst_slt|inst_slti|  
+                        inst_sltu |inst_sltiu|inst_div|inst_divu|
+                        inst_mult |inst_multu|inst_and|inst_andi|  
+                        inst_lui  |inst_nor|inst_or|inst_ori|
+                        inst_xor  |inst_xori|inst_sll|inst_sllv|
+                        inst_sra  |inst_srav|inst_srl|inst_srlv|
+                        inst_beq  |inst_bne|inst_bgez|inst_bgtz|
+                        inst_blez |inst_bltz|inst_bltzal|inst_bgezal|
+                        inst_j    |inst_jal|inst_jr|inst_jalr|  
+                        inst_mfhi |inst_mflo|inst_mthi|inst_mtlo|
+                        inst_lb   |inst_lbu|inst_lh|inst_lhu|
+                        inst_lw   |inst_sb|inst_sh|inst_sw|
                         inst_break|inst_syscall|
-                        inst_eret|inst_mfc0|inst_mtc0;
+                        inst_eret |inst_mfc0|inst_mtc0;
 
     assign stallreq_for_cp0 = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
     assign delay_slot = is_in_delayslot;
@@ -360,10 +359,10 @@ module decoder(
     assign except_of_break = inst_break;
     assign except_of_invalid_inst = ~inst_valid & ce;
 
-    assign excepttype = {inst[15:11], delay_slot,
+    assign excepttype = {inst[15:11]      , delay_slot,
                          except_of_pc_addr, adel, ades, except_of_overflow, 
-                         inst_syscall, inst_break, except_of_invalid_inst,
-                         inst_eret, inst_mfc0, inst_mtc0};
+                         inst_syscall     , inst_break, except_of_invalid_inst,
+                         inst_eret        , inst_mfc0 , inst_mtc0};
     
 //output
     assign inst_info = {
@@ -380,5 +379,10 @@ module decoder(
         rf_waddr,       // 5:1
         sel_rf_res     // 0
     };
+
+    assign inst_flag[0] = inst_div | inst_divu | inst_mult | inst_multu;
+    assign inst_flag[1] = inst_lb  | inst_lbu  | inst_lh   | inst_lhu  |
+                          inst_lw  | inst_sb   | inst_sh   | inst_sw;
+    assign inst_flag[2] = inst_mfc0| inst_mtc0;
 
 endmodule

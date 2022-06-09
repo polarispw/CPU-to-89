@@ -4,43 +4,23 @@ module ID(
     input wire rst,
     input wire flush,
     input wire [`StallBus-1:0] stall,
-    
-    output wire stallreq_for_load,
-    output wire stallreq_for_cp0,
-    output wire stallreq_for_bru,
-
+   
     input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
-
     input wire [63:0] inst_sram_rdata,
 
-    input wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus,
+    input wire [`EX_TO_RF_WD-1:0]  ex_to_rf_bus,
     input wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
-    input wire [`WB_TO_RF_WD-1:0] wb_to_rf_bus,
+    input wire [`WB_TO_RF_WD-1:0]  wb_to_rf_bus,
 
     output wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
-
-    output wire [`BR_WD-1:0] br_bus 
+    output wire [`BR_WD-1:0] br_bus,
+    output wire stallreq_for_load,
+    output wire stallreq_for_cp0,
+    output wire stallreq_for_bru
 );
 
+// process input data
     reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;
-    wire [31:0] inst;
-    wire [31:0] inst2;
-    wire [31:0] id_pc;
-    wire ce;
-
-    wire ex_rf_we, mem_rf_we, wb_rf_we;
-    wire [4:0] ex_rf_waddr, mem_rf_waddr, wb_rf_waddr;
-    wire [31:0] ex_rf_wdata, mem_rf_wdata, wb_rf_wdata;
-
-    wire ex_hi_we, mem_hi_we, wb_hi_we;
-    wire ex_lo_we, mem_lo_we, wb_lo_we;
-    wire [31:0] ex_hi_i, mem_hi_i, wb_hi_i;
-    wire [31:0] ex_lo_i, mem_lo_i, wb_lo_i;
-
-    wire [31:0] hi_o, lo_o;
-    wire [31:0] hi, lo;
-    wire last_inst_is_mfc0;
-
     reg flag;
     reg [31:0] buf_inst;
 
@@ -66,10 +46,24 @@ module ID(
             buf_inst <= inst_sram_rdata;
         end
     end
-    
-    assign inst = ce ? flag ? buf_inst : inst_sram_rdata[31:0] : 32'b0;
-    assign inst2 = ce ? flag ? buf_inst : inst_sram_rdata[63:32] : 32'b0;
-    
+
+// signal declare/init 
+    wire [31:0] id_pc;
+    wire ce;
+
+    wire ex_rf_we, mem_rf_we, wb_rf_we;
+    wire [4:0]  ex_rf_waddr, mem_rf_waddr, wb_rf_waddr;
+    wire [31:0] ex_rf_wdata, mem_rf_wdata, wb_rf_wdata;
+
+    wire ex_hi_we, mem_hi_we, wb_hi_we;
+    wire ex_lo_we, mem_lo_we, wb_lo_we;
+    wire [31:0] ex_hi_i, mem_hi_i, wb_hi_i;
+    wire [31:0] ex_lo_i, mem_lo_i, wb_lo_i;
+
+    wire [31:0] hi_o, lo_o;
+    wire [31:0] hi_rdata, lo_rdata;
+    wire last_inst_is_mfc0;
+
     assign {
         ce,
         id_pc
@@ -103,58 +97,70 @@ module ID(
         wb_rf_wdata
     } = wb_to_rf_bus;
 
-    wire [5:0] opcode;
-    wire [4:0] rs,rt,rd,sa;
-    wire [5:0] func;
-    wire [15:0] imm;
-    wire [25:0] instr_index;
-    wire [19:0] code;
-    wire [4:0] base;
-    wire [15:0] offset;
-    wire [2:0] sel;
+// inst FIFO reg
 
-    wire [63:0] op_d, func_d;
-    wire [31:0] rs_d, rt_d, rd_d, sa_d;
 
-    wire [2:0] sel_alu_src1;
-    wire [3:0] sel_alu_src2;
-    wire [11:0] alu_op;
-    wire [7:0] hilo_op; 
-    wire [7:0] mem_op;
+// decode inst
+    wire [31:0] inst1;
+    wire [31:0] inst1_pc;
+    wire [31:0] inst2;
+    wire [31:0] inst2_pc;
 
-    wire data_ram_en;
-    wire data_ram_wen;
+    assign inst1 = ce ? flag ? buf_inst : inst_sram_rdata[31: 0] : 32'b0;
+    assign inst2 = ce ? flag ? buf_inst : inst_sram_rdata[63:32] : 32'b0;
+    assign inst1_pc = id_pc;
+    assign inst2_pc = id_pc+32'd8;
     
-    wire rf_we;
-    wire [4:0] rf_waddr;
-    wire sel_rf_res;
-    wire [2:0] sel_rf_dst;
+    decoder u1_decoder(
+        .inst_sram_rdata  (inst1            ),
+        .id_pc            (inst1_pc         ),
+        .ce               (ce               ),
+        .ex_rf_we         (ex_rf_we         ),
+        .last_inst_is_mfc0(last_inst_is_mfc0),
+        .ex_rf_waddr      (ex_rf_waddr      ),
+        .inst_info        (inst_info1       ),
+        .br_bus           (br_bus           ),
+        .stallreq_for_load(stallreq_for_load),
+        .stallreq_for_cp0 (stallreq_for_cp0 ),
+        .inst_flag        (inst_flag1       )
+    );
 
+    decoder u2_decoder(
+        .inst_sram_rdata  (inst2            ),
+        .id_pc            (inst2_pc         ),
+        .ce               (ce               ),
+        .ex_rf_we         (ex_rf_we         ),
+        .last_inst_is_mfc0(last_inst_is_mfc0),
+        .ex_rf_waddr      (ex_rf_waddr      ),
+        .inst_info        (inst_info1       ),
+        .br_bus           (br_bus           ),
+        .stallreq_for_load(stallreq_for_load),
+        .stallreq_for_cp0 (stallreq_for_cp0 ),
+        .inst_flag        (inst_flag2       )
+    );
+
+// dual launch
+
+// operate regfile
     wire [31:0] rf_rdata1, rf_rdata2, rdata1, rdata2;
-    wire [31:0] bru_rdata1, bru_rdata2;
-
-    wire inst_valid;
-    wire [`EXCEPTTYPE_WD:0] excepttype;
 
     regfile u_regfile(
-    	.clk    (clk    ),
-        .raddr1 (rs ),
-        .rdata1 (rf_rdata1 ),
-        .raddr2 (rt ),
-        .rdata2 (rf_rdata2 ),
+    	.clk    (clk          ),
+        .raddr1 (rs           ),
+        .rdata1 (rf_rdata1    ),
+        .raddr2 (rt           ),
+        .rdata2 (rf_rdata2    ),
         .we     (wb_rf_we     ),
         .waddr  (wb_rf_waddr  ),
         .wdata  (wb_rf_wdata  )
     );
 
-    assign rdata1 = (ex_rf_we & (ex_rf_waddr == rs)) ? ex_rf_wdata :
+    assign rdata1 = (ex_rf_we  & (ex_rf_waddr == rs))  ? ex_rf_wdata  :
                     (mem_rf_we & (mem_rf_waddr == rs)) ? mem_rf_wdata :
-                    (wb_rf_we & (wb_rf_waddr == rs)) ? wb_rf_wdata :
-                                                       rf_rdata1;
-    assign rdata2 = (ex_rf_we & (ex_rf_waddr == rt)) ? ex_rf_wdata :
+                    (wb_rf_we  & (wb_rf_waddr == rs))  ? wb_rf_wdata  :  rf_rdata1;
+    assign rdata2 = (ex_rf_we  & (ex_rf_waddr == rt))  ? ex_rf_wdata  :
                     (mem_rf_we & (mem_rf_waddr == rt)) ? mem_rf_wdata :
-                    (wb_rf_we & (wb_rf_waddr == rt)) ? wb_rf_wdata :
-                                                       rf_rdata2;
+                    (wb_rf_we  & (wb_rf_waddr == rt))  ? wb_rf_wdata  :  rf_rdata2;
 
     hilo_reg u_hilo_reg(
     	.clk   (clk      ),
@@ -167,27 +173,27 @@ module ID(
         .lo_o  (lo_o     )
     );
 
-    assign hi = ex_hi_we ? ex_hi_i :
-                mem_hi_we ? mem_hi_i :
-                wb_hi_we ? wb_hi_i :
-                           hi_o;
-    assign lo = ex_lo_we ? ex_lo_i :
-                mem_lo_we ? mem_lo_i :
-                wb_lo_we ? wb_lo_i :
-                           lo_o;
+    assign hi_rdata = ex_hi_we  ? ex_hi_i  :
+                      mem_hi_we ? mem_hi_i :
+                      wb_hi_we  ? wb_hi_i  : hi_o;
+    assign lo_rdata = ex_lo_we  ? ex_lo_i  :
+                      mem_lo_we ? mem_lo_i :
+                      wb_lo_we  ? wb_lo_i  : lo_o;
+
+/*
 //decode part
-    assign opcode = inst[31:26];
-    assign rs = inst[25:21];
-    assign rt = inst[20:16];
-    assign rd = inst[15:11];
-    assign sa = inst[10:6];
-    assign func = inst[5:0];
-    assign imm = inst[15:0];
-    assign instr_index = inst[25:0];
-    assign code = inst[25:6];
-    assign base = inst[25:21];
-    assign offset = inst[15:0];
-    assign sel = inst[2:0];
+    assign opcode = inst1[31:26];
+    assign rs = inst1[25:21];
+    assign rt = inst1[20:16];
+    assign rd = inst1[15:11];
+    assign sa = inst1[10:6];
+    assign func = inst1[5:0];
+    assign imm = inst1[15:0];
+    assign instr_index = inst1[25:0];
+    assign code = inst1[25:6];
+    assign base = inst1[25:21];
+    assign offset = inst1[15:0];
+    assign sel = inst1[2:0];
 
     wire inst_add,  inst_addi,  inst_addu,  inst_addiu;
     wire inst_sub,  inst_subu,  inst_slt,   inst_slti;
@@ -239,7 +245,7 @@ module ID(
         .out (sa_d      )
     );
     
-    //inst launch
+    //inst1 launch
     assign inst_add     = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0000];
     assign inst_addi    = op_d[6'b00_1000];
     assign inst_addu    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0001];
@@ -295,8 +301,8 @@ module ID(
     assign inst_sh      = op_d[6'b10_1001];
     assign inst_sw      = op_d[6'b10_1011];
     assign inst_eret    = op_d[6'b01_0000] & func_d[6'b01_1000];
-    assign inst_mfc0    = op_d[6'b01_0000] & rs_d[5'b0_0000] & sa_d[5'b0_0000] & (inst[5:3]==3'b000);
-    assign inst_mtc0    = op_d[6'b01_0000] & rs_d[5'b0_0100] & sa_d[5'b0_0000] & (inst[5:3]==3'b000);
+    assign inst_mfc0    = op_d[6'b01_0000] & rs_d[5'b0_0000] & sa_d[5'b0_0000] & (inst1[5:3]==3'b000);
+    assign inst_mtc0    = op_d[6'b01_0000] & rs_d[5'b0_0100] & sa_d[5'b0_0000] & (inst1[5:3]==3'b000);
 
     //data select
     // rs to reg1
@@ -395,7 +401,7 @@ module ID(
                     | {5{sel_rf_dst[1]}} & rt
                     | {5{sel_rf_dst[2]}} & 32'd31;
 
-//branch&jump
+    //branch&jump
     wire br_e;
     wire [31:0] br_addr;
     wire rs_eq_rt;
@@ -426,14 +432,14 @@ module ID(
                 | inst_jr
                 | inst_jal
                 | inst_jalr;
-    assign br_addr = inst_beq   ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0}) 
-                   : inst_bne   ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
-                   : inst_bgez  ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
-                   : inst_bgtz  ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
-                   : inst_blez  ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
-                   : inst_bltz  ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
-                   : inst_bltzal? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
-                   : inst_bgezal? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0})
+    assign br_addr = inst_beq   ? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0}) 
+                   : inst_bne   ? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
+                   : inst_bgez  ? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
+                   : inst_bgtz  ? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
+                   : inst_blez  ? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
+                   : inst_bltz  ? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
+                   : inst_bltzal? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
+                   : inst_bgezal? (pc_plus_4 + {{14{inst1[15]}},inst1[15:0],2'b0})
                    : inst_j     ? {id_pc[31:28],instr_index,2'b0}
                    : inst_jr    ? rdata1 
                    : inst_jal   ? {id_pc[31:28],instr_index,2'b0} 
@@ -458,7 +464,7 @@ module ID(
         br_addr
     };
     
-//except
+    //except
     wire delay_slot;
     wire except_of_pc_addr;
     wire adel;
@@ -492,19 +498,24 @@ module ID(
     assign except_of_break = inst_break;
     assign except_of_invalid_inst = ~inst_valid & ce;
 
-    assign excepttype = {inst[15:11], delay_slot,
+    assign excepttype = {inst1[15:11], delay_slot,
                          except_of_pc_addr, adel, ades, except_of_overflow, 
                          inst_syscall, inst_break, except_of_invalid_inst,
                          inst_eret, inst_mfc0, inst_mtc0};
     
-//output
+
+
+    //output
     assign id_to_ex_bus = {
         excepttype,     // 251:236
         mem_op,         // 235:228
         hilo_op,        // 227:220
-        hi, lo,         // 219:156
+
+        hi_rdata,       // 219:156
+        lo_rdata,       
         id_pc,          // 155:124
-        inst,           // 123:92
+        inst1,          // 123:92
+
         alu_op,         // 91:80
         sel_alu_src1,   // 79:77
         sel_alu_src2,   // 76:73
@@ -516,5 +527,9 @@ module ID(
         rdata1,         // 63:32
         rdata2          // 31:0
     };
-
+*/
+// output
+    assign id_to_ex_bus = {
+        
+    }
 endmodule
