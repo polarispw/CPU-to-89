@@ -4,10 +4,9 @@ module hilo_reg(
     input wire rst,
 
     input wire hi_we,
-    input wire [31:0] hi_i,
     input wire lo_we,
+    input wire [31:0] hi_i,
     input wire [31:0] lo_i,
-
 
     output wire [31:0] hi_o,
     output wire [31:0] lo_o

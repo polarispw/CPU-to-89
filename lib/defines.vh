@@ -1,5 +1,6 @@
 `define IF_TO_ID_WD 33
-`define ID_TO_EX_WD 252
+`define ID_TO_EX_WD 506
+`define INST_BUS_WD 252
 `define EX_TO_MEM_WD 167
 `define MEM_TO_WB_WD 136
 `define BR_WD 33

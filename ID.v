@@ -144,7 +144,7 @@ module ID(
     );
 
 
-// decode & launch check
+// decode 
     wire [59:0] inst1_info, inst2_info;
     wire [32:0] br_bus1, br_bus2;
     wire [2:0] inst_flag1, inst_flag2;
@@ -161,8 +161,19 @@ module ID(
     wire rf_we_i1, rf_we_i2;
     wire [4:0] rf_waddr_i1, rf_waddr_i2;
 
+    wire [31:0] rf_rdata1_i1, rf_rdata2_i1;
+    wire [31:0] rf_rdata1_i2, rf_rdata2_i2;
+    wire [31:0] rdata1_i1, rdata2_i1;
+    wire [31:0] rdata1_i2, rdata2_i2;
+    
+    wire [31:0] hi_o, lo_o;
+    wire [31:0] hi_rdata, lo_rdata;
+    // both hi/lo reg are unique, there is no need to declare twice(i1,i2)
+
     decoder u1_decoder(
         .inst_sram_rdata  (inst1            ),
+        .rdata1           (rdata1_i1        ),  
+        .rdata2           (rdata2_i1        ), 
         .id_pc            (inst1_pc         ),
         .ce               (ce               ),
         .ex_rf_we         (ex_rf_we         ),
@@ -177,6 +188,8 @@ module ID(
 
     decoder u2_decoder(
         .inst_sram_rdata  (inst2            ),
+        .rdata1           (rdata1_i2        ),  
+        .rdata2           (rdata2_i2        ),
         .id_pc            (inst2_pc         ),
         .ce               (ce               ),
         .ex_rf_we         (ex_rf_we         ),
@@ -189,6 +202,7 @@ module ID(
         .inst_flag        (inst_flag2       )
     );
 
+// launch check
     assign sel_i1_src1 = inst1_info[15:13];
     assign sel_i2_src1 = inst2_info[15:13];
     assign sel_i1_src2 = inst1_info[12:9];
@@ -205,7 +219,8 @@ module ID(
 
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) && (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
     assign launch_mode = (data_corelate | inst_conflict) ? `SingleIssue : `DualIssue;
-    assign launched = id_pc != 32'b0 ? 1'b1 : 1'b0;
+    assign launched = id_pc != 32'b0 ? 1'b1 : 1'b0; // 这里要优化
+
     always@(posedge clk)begin
         if(rst|flush) begin
             launch_r <= 1'b0;
@@ -215,32 +230,28 @@ module ID(
         end
     end
 
-    assign br_bus = br_bus1;
+    assign br_bus = br_bus1[32] ? br_bus1[32:0] :
+                    br_bus2[32] ? br_bus2[32:0] : 33'b0 ;
 
 // operate regfile
-    wire [31:0] rf_rdata1, rf_rdata2;
-    wire [31:0] rdata1, rdata2;
-    wire [31:0] hi_o, lo_o;
-    wire [31:0] hi_rdata, lo_rdata;
-
-    // IO
+    // RW
     regfile u_regfile(
-    	.clk    (clk          ),
-        .raddr1 (rs           ),
-        .rdata1 (rf_rdata1    ),
-        .raddr2 (rt           ),
-        .rdata2 (rf_rdata2    ),
-        .we     (wb_rf_we     ),
-        .waddr  (wb_rf_waddr  ),
-        .wdata  (wb_rf_wdata  )
+    	.clk       (clk          ),
+        .we_i1     (wb_rf_we     ),
+        .we_i2     (wb_rf_we     ),
+        .waddr_i1  (wb_rf_waddr  ),
+        .waddr_i2  (wb_rf_waddr  ),
+        .wdata_i1  (wb_rf_wdata  ),
+        .wdata_i2  (wb_rf_wdata  ),
+        .raddr1_i1 (rs_i1        ),
+        .raddr2_i1 (rt_i1        ),
+        .raddr1_i2 (rs_i1        ),
+        .raddr2_i2 (rt_i1        ),
+        .rdata1_i1 (rf_rdata1_i1 ),
+        .rdata2_i1 (rf_rdata2_i1 ),
+        .rdata1_i2 (rf_rdata1_i2 ),
+        .rdata2_i2 (rf_rdata2_i2 )
     );
-    // bypass corelation
-    assign rdata1 = (ex_rf_we  & (ex_rf_waddr == rs))  ? ex_rf_wdata  :
-                    (mem_rf_we & (mem_rf_waddr == rs)) ? mem_rf_wdata :
-                    (wb_rf_we  & (wb_rf_waddr == rs))  ? wb_rf_wdata  :  rf_rdata1;
-    assign rdata2 = (ex_rf_we  & (ex_rf_waddr == rt))  ? ex_rf_wdata  :
-                    (mem_rf_we & (mem_rf_waddr == rt)) ? mem_rf_wdata :
-                    (wb_rf_we  & (wb_rf_waddr == rt))  ? wb_rf_wdata  :  rf_rdata2;
 
     hilo_reg u_hilo_reg(
     	.clk   (clk      ),
@@ -253,6 +264,23 @@ module ID(
         .lo_o  (lo_o     )
     );
 
+    // bypass corelation
+    assign rdata1_i1 = (ex_rf_we  & (ex_rf_waddr  == rs_i1))  ? ex_rf_wdata  :
+                       (mem_rf_we & (mem_rf_waddr == rs_i1))  ? mem_rf_wdata :
+                       (wb_rf_we  & (wb_rf_waddr  == rs_i1))  ? wb_rf_wdata  :  rf_rdata1_i1;
+
+    assign rdata2_i1 = (ex_rf_we  & (ex_rf_waddr  == rt_i1))  ? ex_rf_wdata  :
+                       (mem_rf_we & (mem_rf_waddr == rt_i1))  ? mem_rf_wdata :
+                       (wb_rf_we  & (wb_rf_waddr  == rt_i1))  ? wb_rf_wdata  :  rf_rdata2_i1;
+
+    assign rdata1_i2 = (ex_rf_we  & (ex_rf_waddr  == rs_i2))  ? ex_rf_wdata  :
+                       (mem_rf_we & (mem_rf_waddr == rs_i2))  ? mem_rf_wdata :
+                       (wb_rf_we  & (wb_rf_waddr  == rs_i2))  ? wb_rf_wdata  :  rf_rdata1_i2;
+
+    assign rdata2_i2 = (ex_rf_we  & (ex_rf_waddr  == rt_i2))  ? ex_rf_wdata  :
+                       (mem_rf_we & (mem_rf_waddr == rt_i2))  ? mem_rf_wdata :
+                       (wb_rf_we  & (wb_rf_waddr  == rt_i2))  ? wb_rf_wdata  :  rf_rdata2_i2;
+
     assign hi_rdata = ex_hi_we  ? ex_hi_i  :
                       mem_hi_we ? mem_hi_i :
                       wb_hi_we  ? wb_hi_i  : hi_o;
@@ -262,11 +290,55 @@ module ID(
 
 
 // output
+    wire [`INST_BUS_WD:0] inst1_bus, inst2_bus;
+    wire inst1_valid, inst2_valid;
+
+    assign inst1_valid = 1'b1;
+    assign inst2_valid = launch_mode==`DualIssue ? 1'b1 : 1'b0;
+
+    assign inst1_bus = {
+        inst1_info[59:28],// 251:220
+        hi_rdata,         // 219:188
+        lo_rdata,         // 187:156
+        inst1_pc,         // 155:124
+        inst1,            // 123:92
+        inst1_info[27:0], // 91:64
+        rdata2_i1,        // 63:32
+        rdata1_i1         // 31:0
+    };
+    assign inst2_bus = {
+        inst2_info[59:28],// 251:220
+        hi_rdata,         // 219:188
+        lo_rdata,         // 187:156
+        inst2_pc,         // 155:124
+        inst2,            // 123:92
+        inst2_info[27:0], // 91:64
+        rdata2_i2,        // 63:32
+        rdata1_i2         // 31:0
+    };
+        // excepttype,     // 251:236
+        // mem_op,         // 235:228
+        // hilo_op,        // 227:220
+        // hi_rdata,       // 219:188
+        // lo_rdata,       // 187:156
+        // id_pc,          // 155:124
+        // inst,           // 123:92
+        // alu_op,         // 91:80
+        // sel_alu_src1,   // 79:77
+        // sel_alu_src2,   // 76:73
+        // data_ram_en,    // 72
+        // data_ram_wen,   // 71
+        // rf_we,          // 70
+        // rf_waddr,       // 69:65
+        // sel_rf_res,     // 64
+        // rdata1,         // 63:32
+        // rdata2          // 31:0
+
     assign id_to_ex_bus = {
-        inst2_pc,
-        inst2,
-        inst1_pc,
-        inst1
+        inst2_bus,
+        inst1_bus,
+        inst2_valid,
+        inst1_valid
     };
 
 endmodule

@@ -1,6 +1,8 @@
 `include "defines.vh"
 module decoder(
     input wire [31:0] inst_sram_rdata,
+    input wire [31:0] rdata1,
+    input wire [31:0] rdata2,
     input wire [31:0] id_pc,
     input wire ce,
     input wire ex_rf_we,
@@ -44,9 +46,6 @@ module decoder(
     wire [4:0] rf_waddr;
     wire sel_rf_res;
     wire [2:0] sel_rf_dst;
-
-    wire [31:0] rf_rdata1, rf_rdata2, rdata1, rdata2;
-    wire [31:0] bru_rdata1, bru_rdata2;
 
     wire inst_valid;
     wire [`EXCEPTTYPE_WD:0] excepttype;
@@ -379,8 +378,9 @@ module decoder(
         sel_rf_res      // 0
     };
 
-    assign inst_flag[0] = inst_div | inst_divu | inst_mult | inst_multu;
-    assign inst_flag[1] = inst_lb  | inst_lbu  | inst_lh   | inst_lhu  |
+    assign inst_flag[0] = inst_div | inst_divu | inst_mult | inst_multu|
+                          inst_mfhi| inst_mflo | inst_mthi | inst_mtlo;
+    assign inst_flag[1] = inst_lb  | inst_lbu  | inst_lh   | inst_lhu|
                           inst_lw  | inst_sb   | inst_sh   | inst_sw;
     assign inst_flag[2] = inst_mfc0| inst_mtc0;
 
