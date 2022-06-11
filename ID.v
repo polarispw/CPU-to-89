@@ -8,9 +8,9 @@ module ID(
     input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
     input wire [63:0] inst_sram_rdata,
 
-    input wire [`EX_TO_RF_WD-1:0]  ex_to_rf_bus,
-    input wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
-    input wire [`WB_TO_RF_WD-1:0]  wb_to_rf_bus,
+    input wire [`EX_TO_RF_WD*2-1:0]  ex_to_rf_bus,
+    input wire [`MEM_TO_RF_WD*2-1:0] mem_to_rf_bus,
+    input wire [`WB_TO_RF_WD*2-1:0]  wb_to_rf_bus,
 
     output wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
     output wire [`BR_WD-1:0] br_bus,
@@ -145,7 +145,7 @@ module ID(
 
 
 // decode 
-    wire [59:0] inst1_info, inst2_info;
+    wire [58:0] inst1_info, inst2_info;
     wire [32:0] br_bus1, br_bus2;
     wire [2:0] inst_flag1, inst_flag2;
     wire [4:0] rs_i1, rs_i2, rt_i1, rt_i2;
@@ -245,8 +245,8 @@ module ID(
         .wdata_i2  (wb_rf_wdata  ),
         .raddr1_i1 (rs_i1        ),
         .raddr2_i1 (rt_i1        ),
-        .raddr1_i2 (rs_i1        ),
-        .raddr2_i2 (rt_i1        ),
+        .raddr1_i2 (rs_i2        ),
+        .raddr2_i2 (rt_i2        ),
         .rdata1_i1 (rf_rdata1_i1 ),
         .rdata2_i1 (rf_rdata2_i1 ),
         .rdata1_i2 (rf_rdata1_i2 ),
@@ -290,14 +290,14 @@ module ID(
 
 
 // output
-    wire [`INST_BUS_WD:0] inst1_bus, inst2_bus;
+    wire [`INST_BUS_WD-1:0] inst1_bus, inst2_bus;
     wire inst1_valid, inst2_valid;
 
     assign inst1_valid = 1'b1;
     assign inst2_valid = launch_mode==`DualIssue ? 1'b1 : 1'b0;
 
     assign inst1_bus = {
-        inst1_info[59:28],// 251:220
+        inst1_info[58:28],// 250:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
         inst1_pc,         // 155:124
@@ -307,7 +307,7 @@ module ID(
         rdata1_i1         // 31:0
     };
     assign inst2_bus = {
-        inst2_info[59:28],// 251:220
+        inst2_info[58:28],// 250:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
         inst2_pc,         // 155:124
@@ -316,7 +316,7 @@ module ID(
         rdata2_i2,        // 63:32
         rdata1_i2         // 31:0
     };
-        // excepttype,     // 251:236
+        // excepttype,     // 250:236
         // mem_op,         // 235:228
         // hilo_op,        // 227:220
         // hi_rdata,       // 219:188

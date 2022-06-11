@@ -21,21 +21,24 @@ module mycpu_core(
     output wire [4:0] debug_wb_rf_wnum,
     output wire [31:0] debug_wb_rf_wdata
 );
-    wire [`IF_TO_ID_WD-1:0] if_to_id_bus;
-    wire [`ID_TO_EX_WD-1:0] id_to_ex_bus;
-    wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus;
-    wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus;
-    wire [`BR_WD-1:0] br_bus; 
-    wire [`DATA_SRAM_WD-1:0] ex_dt_sram_bus;
-    wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus;
-    wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus;
-    wire [`WB_TO_RF_WD-1:0] wb_to_rf_bus;
+    // forward
+    wire [`IF_TO_ID_WD-1   :0] if_to_id_bus;
+    wire [`ID_TO_EX_WD-1   :0] id_to_ex_bus;
+    wire [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus;
+    wire [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus;
+    // backward
+    wire [`BR_WD-1         :0] br_bus; 
+    wire [`EX_TO_RF_WD*2-1 :0] ex_to_rf_bus;
+    wire [`MEM_TO_RF_WD*2-1:0] mem_to_rf_bus;
+    wire [`WB_TO_RF_WD*2-1 :0] wb_to_rf_bus;
+    // stall
     wire [`StallBus-1:0] stall;
     wire stallreq_for_load;
     wire stallreq_for_cp0;
     wire stallreq_for_bru;
     wire stallreq_for_ex;
     wire stallreq_for_fifo;
+    // except
     wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus;
     wire [31:0] new_pc;
     wire flush;

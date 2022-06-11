@@ -8,9 +8,9 @@ module EX(
 
     input wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
 
-    output wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
+    output wire [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus,
 
-    output wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus,
+    output wire [`EX_TO_RF_WD*2-1:0] ex_to_rf_bus,
 
     output wire data_sram_en,
     output wire [3:0] data_sram_wen,
@@ -47,12 +47,9 @@ module EX(
     wire [31:0] data_sram_addr_i1, data_sram_addr_i2;
     wire [31:0] data_sram_wdata_i1, data_sram_wdata_i2;
 
-    assign {
-        inst2_bus,
-        inst1_bus,
-        inst2_valid,
-        inst1_valid
-    } = id_to_ex_bus_r;
+    assign {inst2_valid, inst1_valid} = id_to_ex_bus_r[1:0];
+    assign inst1_bus = inst1_valid ? id_to_ex_bus_r[253:2]   : `INST_BUS_WD'b0;
+    assign inst2_bus = inst2_valid ? id_to_ex_bus_r[505:254] : `INST_BUS_WD'b0;
 
     sub_ex u1_sub_ex(
         .flush          (flush             ),
@@ -63,8 +60,8 @@ module EX(
         .data_sram_en   (data_sram_en_i1   ),
         .data_sram_wen  (data_sram_wen_i1  ),
         .data_sram_addr (data_sram_addr_i1 ),
-        .data_sram_wdata (data_sram_wdata_i1)
-    );
+        .data_sram_wdata(data_sram_wdata_i1)
+    );// 除了跳转
 
     sub_ex u2_sub_ex(
         .flush          (flush             ),
@@ -75,8 +72,13 @@ module EX(
         .data_sram_en   (data_sram_en_i2   ),
         .data_sram_wen  (data_sram_wen_i2  ),
         .data_sram_addr (data_sram_addr_i2 ),
-        .data_sram_wdata (data_sram_wdata_i2)
-    );
+        .data_sram_wdata(data_sram_wdata_i2)
+    );// 逻辑运算 移位 算术运算
+
+    assign data_sram_en    = data_sram_en_i1;
+    assign data_sram_wen   = data_sram_wen_i1;
+    assign data_sram_addr  = data_sram_addr_i1;
+    assign data_sram_wdata = data_sram_wdata_i1;
     
 // output
 

@@ -5,15 +5,15 @@ module MEM(
     input wire flush,
     input wire [`StallBus-1:0] stall,
 
-    input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
+    input wire [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus,
     input wire [31:0] data_sram_rdata,
 
-    output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus,
-    output wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
+    output wire [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus,
+    output wire [`MEM_TO_RF_WD*2-1:0] mem_to_rf_bus,
     output wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus
 );
 
-    reg [`EX_TO_MEM_WD-1:0] ex_to_mem_bus_r;
+    reg [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus_r;
 
     always @ (posedge clk) begin
         if (rst) begin
@@ -56,10 +56,21 @@ module MEM(
         rf_we,          // 37
         rf_waddr,       // 36:32
         ex_result       // 31:0
-    } =  ex_to_mem_bus_r;
+    } =  ex_to_mem_bus_r[166:0];
 
+    wire [`HILO_WD-1:0] hilo_bus_i2;
+    wire [31:0] mem_pc_i2;
+    wire rf_we_i2;
+    wire [4:0] rf_waddr_i2;
+    wire [31:0] rf_wdata_i2;
 
+    assign hilo_bus_i2 = ex_to_mem_bus_r[309:244];
+    assign mem_pc_i2   = ex_to_mem_bus_r[243:212];
+    assign rf_we_i2    = ex_to_mem_bus_r[204];
+    assign rf_waddr_i2 = ex_to_mem_bus_r[203:199];
+    assign rf_wdata_i2 = ex_to_mem_bus_r[198:167];
 
+// load data
     wire inst_lb,   inst_lbu,   inst_lh,    inst_lhu,   inst_lw;
     wire inst_sb,   inst_sh,    inst_sw;
 
@@ -80,11 +91,11 @@ module MEM(
                     data_ram_sel[0] ? data_sram_rdata[15: 0] : 16'b0;
     assign w_data = data_sram_rdata;
 
-    assign mem_result = inst_lb     ? {{24{b_data[7]}},b_data} :
-                        inst_lbu    ? {{24{1'b0}},b_data} :
-                        inst_lh     ? {{16{h_data[15]}},h_data} :
-                        inst_lhu    ? {{16{1'b0}},h_data} :
-                        inst_lw     ? w_data : 32'b0; 
+    assign mem_result = inst_lb  ? {{24{b_data[7]}},b_data} :
+                        inst_lbu ? {{24{1'b0}},b_data} :
+                        inst_lh  ? {{16{h_data[15]}},h_data} :
+                        inst_lhu ? {{16{1'b0}},h_data} :
+                        inst_lw  ? w_data : 32'b0; 
 
     wire [31:0] cp0_rdata;
     wire [31:0] new_pc;
@@ -105,23 +116,39 @@ module MEM(
     assign rf_wdata = sel_rf_res & data_ram_en ? mem_result : 
                       excepttype_i[1] ? cp0_rdata : ex_result;
 
-    assign mem_to_wb_bus = to_be_flushed ? `MEM_TO_WB_WD'b0 :
-    {
+// output
+    wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
+
+    assign mem_to_wb_bus_i1 = {
         hilo_bus,   // 135:70
         mem_pc,     // 69:38
         rf_we,      // 37
         rf_waddr,   // 36:32
         rf_wdata    // 31:0
     };
+    assign mem_to_wb_bus_i2 = {
+        hilo_bus_i2,
+        mem_pc_i2,
+        rf_we_i2,
+        rf_waddr_i2,
+        rf_wdata_i2
+    };
+
+    assign mem_to_wb_bus = to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
+    {
+        mem_to_wb_bus_i2,
+        mem_to_wb_bus_i1
+    };
 
     assign mem_to_rf_bus = {
+        hilo_bus_i2,
+        rf_we_i2,
+        rf_waddr_i2,
+        rf_wdata_i2,
         hilo_bus,
         rf_we,
         rf_waddr,
         rf_wdata
     };
-
-
-
 
 endmodule

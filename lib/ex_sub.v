@@ -50,8 +50,8 @@ module sub_ex(
         rf_we,          // 70
         rf_waddr,       // 69:65
         sel_rf_res,     // 64
-        rf_rdata1,      // 63:32
-        rf_rdata2       // 31:0
+        rf_rdata2,      // 63:32
+        rf_rdata1       // 31:0
     } = inst_bus;
 
 // alu
@@ -147,12 +147,12 @@ module sub_ex(
     	.rst          (rst          ),
         .clk          (clk          ),
         .signed_div_i (signed_div_o ),
-        .opdata1_i    (div_opdata1_o    ),
-        .opdata2_i    (div_opdata2_o    ),
-        .start_i      (div_start_o      ),
-        .annul_i      (1'b0      ),
-        .result_o     (div_result     ),
-        .ready_o      (div_ready_i      )
+        .opdata1_i    (div_opdata1_o),
+        .opdata2_i    (div_opdata2_o),
+        .start_i      (div_start_o  ),
+        .annul_i      (1'b0         ),
+        .result_o     (div_result   ),
+        .ready_o      (div_ready_i  )
     );
 
     always @ (*) begin

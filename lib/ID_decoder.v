@@ -9,7 +9,7 @@ module decoder(
     input wire last_inst_is_mfc0,
     input wire [31:0] ex_rf_waddr,
 
-    output wire [59:0] inst_info,
+    output wire [58:0] inst_info,
 
     output wire [32:0] br_bus,
     output wire stallreq_for_load,
@@ -350,7 +350,7 @@ module decoder(
                         inst_eret |inst_mfc0|inst_mtc0;
 
     assign stallreq_for_cp0 = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
-    assign delay_slot = is_in_delayslot;
+    assign delay_slot = 1'b0; //is_in_delayslot;
     assign except_of_pc_addr = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
     assign except_of_overflow = 1'b0;
     assign except_of_syscall = inst_syscall;
@@ -364,10 +364,9 @@ module decoder(
     
 //output
     assign inst_info = {
-        excepttype,     // 59:44
+        excepttype,     // 58:44
         mem_op,         // 43:36
         hilo_op,        // 35:28
-
         alu_op,         // 27:16
         sel_alu_src1,   // 15:13
         sel_alu_src2,   // 12:9
