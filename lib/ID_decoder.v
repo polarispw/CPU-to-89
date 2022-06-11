@@ -48,7 +48,7 @@ module decoder(
     wire [2:0] sel_rf_dst;
 
     wire inst_valid;
-    wire [`EXCEPTTYPE_WD:0] excepttype;
+    wire [`EXCEPTTYPE_WD-1:0] excepttype;
 
 //decode part
     assign opcode = inst[31:26];
@@ -178,7 +178,7 @@ module decoder(
     assign sel_alu_src1[0] = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
                            | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_addi | inst_sub 
                            | inst_and | inst_andi | inst_nor | inst_xori | inst_sllv | inst_srav | inst_srlv
-                           | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh;
+                           | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_jr | inst_jalr;
 
     // pc to reg1
     assign sel_alu_src1[1] = inst_jal | inst_bltzal | inst_bgezal | inst_jalr;

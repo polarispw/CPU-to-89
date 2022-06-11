@@ -1,4 +1,4 @@
-`define IF_TO_ID_WD 33
+`define IF_TO_ID_WD 34
 `define ID_TO_EX_WD 504
 `define INST_BUS_WD 252
 `define EX_TO_MEM_WD 167
@@ -9,7 +9,7 @@
 `define MEM_TO_RF_WD 104
 `define WB_TO_RF_WD 104
 `define HILO_WD 66
-`define EXCEPTTYPE_WD 15
+`define EXCEPTTYPE_WD 16
 `define CP0_TO_CTRL_WD 33
 
 `define StallBus 6

@@ -17,7 +17,8 @@ module IF(
     output wire [31:0] inst_sram_wdata
 );
     reg [31:0] pc_reg;
-    reg ce_reg;
+    reg ce_reg;// 是否取址
+    reg discard_following_inst;// 如果当前需要跳转则让FIFO忽略其要接收的两条指令
     wire [31:0] next_pc;
     wire br_e;
     wire [31:0] br_addr;
@@ -26,7 +27,6 @@ module IF(
         br_e,
         br_addr
     } = br_bus;
-
 
     always @ (posedge clk) begin
         if (rst) begin
@@ -49,9 +49,20 @@ module IF(
         end
     end
 
+    always @(*) begin
+        if (rst) begin
+            discard_following_inst <= 1'b0;
+        end
+        else if (br_e) begin
+            discard_following_inst <= 1'b1;
+        end
+        else begin
+            discard_following_inst <= 1'b0;
+        end
+    end
 
     assign next_pc = flush ? new_pc :
-                    //  br_e ? br_addr : 
+                     br_e ? br_addr : 
                      pc_reg + 32'd8;
 
     
@@ -61,6 +72,7 @@ module IF(
     assign inst_sram_wdata = 32'b0;
 
     assign if_to_id_bus = {
+        discard_following_inst,
         ce_reg,
         pc_reg
     };

@@ -2,7 +2,7 @@
 module CP0(
     input wire rst,
     input wire clk,
-    input wire [`EXCEPTTYPE_WD:0] excepttype,
+    input wire [`EXCEPTTYPE_WD-1:0] excepttype,
     input wire [31:0] current_pc,
     input wire [31:0] rt_rdata,
     input wire [31:0] bad_addr,
@@ -36,9 +36,20 @@ module CP0(
     reg [31:0] cp0_rdata;
     reg interrupt_happen;
 
-    assign {target_addr, is_in_delayslot, except_of_pc_addr, ades, adel, except_of_overflow, except_of_syscall, 
-            except_of_break, except_of_invalid_inst, inst_eret, inst_mfc0, inst_mtc0} 
-            = excepttype;
+    assign {
+        target_addr, //15:11
+        is_in_delayslot, //10
+        except_of_pc_addr, //9
+        ades, //8
+        adel, //7
+        except_of_overflow, //6
+        except_of_syscall, //5
+        except_of_break, //4
+        except_of_invalid_inst, //3
+        inst_eret, //2
+        inst_mfc0, //1
+        inst_mtc0//0
+    } = excepttype;
 
     assign interrupt = cause[15:8]&status[15:8];
 

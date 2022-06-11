@@ -42,7 +42,7 @@ module MEM(
     wire [31:0] mem_result;
     wire [`HILO_WD-1:0] hilo_bus;
     wire [7:0] mem_op;
-    wire [`EXCEPTTYPE_WD:0] excepttype_i;
+    wire [`EXCEPTTYPE_WD-1:0] excepttype_i;
 
     assign {
         excepttype_i,   // 166:151

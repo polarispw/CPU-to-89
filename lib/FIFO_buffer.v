@@ -43,7 +43,6 @@ module Instbuffer(
             head <= `InstBufferSizeLog2'h0;
 			FIFO_valid <= `InstBufferSize'h0;
         end
-        
 		// pop after launching
         else if( issue_i == `Valid && issue_mode_i == `SingleIssue )begin//Issue one inst
             FIFO_valid[head] <= `Invalid;

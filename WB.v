@@ -16,6 +16,17 @@ module WB(
 );
 
     reg [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus_r;
+    
+    reg [31:0] debug_wb_pc_r;
+    reg [3:0] debug_wb_rf_wen_r;
+    reg [4:0] debug_wb_rf_wnum_r;
+    reg [31:0] debug_wb_rf_wdata_r;
+
+    wire [31:0] wb_pc_i1, wb_pc_i2;
+    wire rf_we_i1, rf_we_i2;
+    wire [4:0] rf_waddr_i1, rf_waddr_i2;
+    wire [31:0] rf_wdata_i1, rf_wdata_i2;
+    wire [`HILO_WD-1:0] hilo_bus_i1, hilo_bus_i2;
 
     always @ (posedge clk) begin
         if (rst) begin
@@ -31,12 +42,6 @@ module WB(
             mem_to_wb_bus_r <= mem_to_wb_bus;
         end
     end
-
-    wire [31:0] wb_pc_i1, wb_pc_i2;
-    wire rf_we_i1, rf_we_i2;
-    wire [4:0] rf_waddr_i1, rf_waddr_i2;
-    wire [31:0] rf_wdata_i1, rf_wdata_i2;
-    wire [`HILO_WD-1:0] hilo_bus_i1, hilo_bus_i2;
 
     assign {
         hilo_bus_i2,
@@ -61,11 +66,24 @@ module WB(
         rf_waddr_i1,
         rf_wdata_i1
     };
+    
+    always @ (wb_pc_i1) begin
+        debug_wb_pc_r <= wb_pc_i1;
+        debug_wb_rf_wen_r <= {4{rf_we_i1}};
+        debug_wb_rf_wnum_r <= rf_waddr_i1;
+        debug_wb_rf_wdata_r <= rf_wdata_i1;
+    end
 
-    assign debug_wb_pc = wb_pc_i1;
-    assign debug_wb_rf_wen = {4{rf_we_i1}};
-    assign debug_wb_rf_wnum = rf_waddr_i1;
-    assign debug_wb_rf_wdata = rf_wdata_i1;
+    always @ (negedge clk) begin
+        debug_wb_pc_r <= wb_pc_i2;
+        debug_wb_rf_wen_r <= {4{rf_we_i2}};
+        debug_wb_rf_wnum_r <= rf_waddr_i2;
+        debug_wb_rf_wdata_r <= rf_wdata_i2;
+    end
 
+    assign debug_wb_pc = debug_wb_pc_r;
+    assign debug_wb_rf_wen = debug_wb_rf_wen_r;
+    assign debug_wb_rf_wnum = debug_wb_rf_wnum_r;
+    assign debug_wb_rf_wdata = debug_wb_rf_wdata_r;
     
 endmodule

@@ -28,8 +28,8 @@ module sub_ex(
     wire [31:0] hi_i, lo_i;
     wire [7:0] hilo_op;
     wire [7:0] mem_op;
-    wire [`EXCEPTTYPE_WD:0] excepttype_i;
-    wire [`EXCEPTTYPE_WD:0] excepttype_o;
+    wire [`EXCEPTTYPE_WD-1:0] excepttype_i;
+    wire [`EXCEPTTYPE_WD-1:0] excepttype_o;
     wire is_inst_mfc0;
     wire except_of_pc_addr;
     wire adel;
