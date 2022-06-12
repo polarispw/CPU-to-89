@@ -54,6 +54,99 @@ module ID(
     assign {discard_current_inst, ce, id_pc} = if_to_id_bus_r;
 
 
+// FIFO inst buffer
+
+    wire [31:0] inst1_in;
+    wire [31:0] inst2_in;
+    wire [31:0] inst1_in_pc;
+    wire [31:0] inst2_in_pc;
+    wire inst1_in_val;
+    wire inst2_in_val;
+
+    wire [31:0] inst1;
+    wire [31:0] inst2;
+    wire [31:0] inst1_pc;
+    wire [31:0] inst2_pc;
+    wire out_valid;
+    wire fifo_full;
+
+    wire launched; 
+    wire launch_mode;
+    wire able_to_launch;
+    reg launch_r, br_en_r;
+
+    assign inst1_in = ce & ~discard_current_inst ? inst_sram_rdata[31: 0] : 32'b0;
+    assign inst2_in = ce & ~discard_current_inst ? inst_sram_rdata[63:32] : 32'b0;
+
+    assign inst1_in_pc = ce & ~discard_current_inst ? id_pc : 32'b0;
+    assign inst2_in_pc = ce & ~discard_current_inst ? id_pc+32'd4 : 32'b0;
+
+    assign inst1_in_val = id_pc   == 32'b0 ? 1'b0 :
+                          stall[1]==`Stop  ? 1'b0 : 
+                          ~ce ? 1'b0 : 1'b1;
+    assign inst2_in_val = id_pc   == 32'b0 ? 1'b0 :
+                          stall[1]==`Stop  ? 1'b0 : 
+                          ~ce ? 1'b0 : 1'b1;
+    Instbuffer FIFO_buffer(
+        .clk                  (clk               ),
+        .rst                  (rst               ),
+        .flush                (flush | br_bus[32]),
+        .issue_i              (launch_r          ),
+        .issue_mode_i         (launch_mode       ),
+        .ICache_inst1_i       (inst1_in          ),
+        .ICache_inst2_i       (inst2_in          ),
+        .ICache_inst1_addr_i  (inst1_in_pc       ),
+        .ICache_inst2_addr_i  (inst2_in_pc       ),
+        .ICache_inst1_valid_i (inst1_in_val      ),
+        .ICache_inst2_valid_i (inst2_in_val      ),
+        .only_delayslot_inst_i(1'b0              ),
+        .issue_inst1_o        (inst1             ),
+        .issue_inst2_o        (inst2             ),
+        .issue_inst1_addr_o   (inst1_pc          ),
+        .issue_inst2_addr_o   (inst2_pc          ),
+        .issue_ok_o           (able_to_launch    ),
+        .buffer_full_o        (fifo_full         )
+    );
+
+    // reg [31:0] inst1, inst2;
+    // reg [31:0] inst1_pc, inst2_pc;
+    // reg able_to_launch;
+
+    // always @(*) begin
+    //     if (rst | flush | br_bus[32]) begin
+    //         inst1 <= 32'b0;
+    //         inst2 <= 32'b0;
+    //         inst1_pc <= 32'b0;
+    //         inst2_pc <= 32'b0;
+    //         able_to_launch <= 1'b0;
+    //         br_en_r <= 1'b0;
+    //     end
+    //     else if (stall[1]==`Stop && stall[2]==`NoStop) begin
+    //         inst1 <= 32'b0;
+    //         inst2 <= 32'b0;
+    //         inst1_pc <= 32'b0;
+    //         inst2_pc <= 32'b0;
+    //         able_to_launch <= 1'b0;
+    //         br_en_r <= 1'b0;
+    //     end
+    //     else if (stall[1]==`NoStop) begin
+    //         inst1 <= inst1_o;
+    //         inst2 <= inst2_o;
+    //         inst1_pc <= inst1_pc_o;
+    //         inst2_pc <= inst2_pc_o;
+    //         able_to_launch <= out_valid;
+    //         br_en_r <= br_bus[32];
+    //     end
+    //     else if (stall[1]==`Stop && stall[2]==`Stop && ~flag) begin
+    //         inst1 <= 32'b0;
+    //         inst2 <= 32'b0;
+    //         inst1_pc <= 32'b0;
+    //         inst2_pc <= 32'b0;
+    //         able_to_launch <= 1'b0;
+    //         br_en_r <= 1'b0;
+    //     end
+    // end
+
 // bypass and WB signal declare/init 
 
     wire ex_rf_we, mem_rf_we, wb_rf_we;
@@ -126,59 +219,6 @@ module ID(
     } = wb_to_rf_bus;
 
 
-// FIFO inst buffer
-
-    wire [31:0] inst1_in;
-    wire [31:0] inst2_in;
-    wire [31:0] inst1_in_pc;
-    wire [31:0] inst2_in_pc;
-    wire inst1_in_val;
-    wire inst2_in_val;
-
-    wire [31:0] inst1;
-    wire [31:0] inst2;
-    wire [31:0] inst1_pc;
-    wire [31:0] inst2_pc;
-    wire able_to_launch;
-    wire fifo_full;
-
-    wire launched; 
-    wire launch_mode;
-    reg launch_r;
-
-    assign inst1_in = ce & ~discard_current_inst ? 
-           flag ? buf_inst : 
-           inst_sram_rdata[31: 0] : 32'b0;
-    assign inst2_in = ce & ~discard_current_inst ? 
-           flag ? buf_inst : 
-           inst_sram_rdata[63:32] : 32'b0;
-    assign inst1_in_pc = id_pc;
-    assign inst2_in_pc = id_pc+32'd4;
-    assign inst1_in_val = id_pc == 32'b0 ? 1'b0 : 1'b1;
-    assign inst2_in_val = id_pc == 32'b0 ? 1'b0 : 1'b1;
-
-    Instbuffer FIFO_buffer(
-        .clk                  (clk               ),
-        .rst                  (rst               ),
-        .flush                (flush | br_bus[32]),
-        .issue_i              (launch_r          ),
-        .issue_mode_i         (launch_mode       ),
-        .ICache_inst1_i       (inst1_in          ),
-        .ICache_inst2_i       (inst2_in          ),
-        .ICache_inst1_addr_i  (inst1_in_pc       ),
-        .ICache_inst2_addr_i  (inst2_in_pc       ),
-        .ICache_inst1_valid_i (inst1_in_val      ),
-        .ICache_inst2_valid_i (inst2_in_val      ),
-        .only_delayslot_inst_i(inst1_in_delayslot),
-        .issue_inst1_o        (inst1             ),
-        .issue_inst2_o        (inst2             ),
-        .issue_inst1_addr_o   (inst1_pc          ),
-        .issue_inst2_addr_o   (inst2_pc          ),
-        .issue_ok_o           (able_to_launch    ),
-        .buffer_full_o        (fifo_full         )
-    );
-
-
 // decode instructions
 
     wire [58:0] inst1_info, inst2_info;
@@ -233,8 +273,8 @@ module ID(
         .ex_rf_waddr      (ex_rf_waddr      ),
         .inst_info        (inst2_info       ),
         .br_bus           (br_bus2          ),
-        .stallreq_for_load(stallreq_for_load),
-        .stallreq_for_cp0 (stallreq_for_cp0 ),
+        // .stallreq_for_load(stallreq_for_load),
+        // .stallreq_for_cp0 (stallreq_for_cp0 ),
         .inst_flag        (inst_flag2       )
     );
 
@@ -256,14 +296,14 @@ module ID(
 
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) && (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
     assign launch_mode = (data_corelate | inst_conflict) ? `SingleIssue : `DualIssue;
-    assign launched = stall[1] | ~able_to_launch ? 1'b0 : 1'b1; // 这里要优化
+    assign launched = able_to_launch ? 1'b1 : 1'b0; // 这里要优化
 
     always@(*)begin
         if(rst|flush) begin
             launch_r <= 1'b0;
         end
         else begin
-            launch_r <=launched;
+            launch_r <= launched;
         end
     end
 
@@ -271,21 +311,21 @@ module ID(
 // operate regfile
     // RW
     regfile u_regfile(
-    	.clk       (clk          ),
-        .we_i1     (wb_rf_we     ),
-        .we_i2     (wb_rf_we     ),
-        .waddr_i1  (wb_rf_waddr  ),
-        .waddr_i2  (wb_rf_waddr  ),
-        .wdata_i1  (wb_rf_wdata  ),
-        .wdata_i2  (wb_rf_wdata  ),
-        .raddr1_i1 (rs_i1        ),
-        .raddr2_i1 (rt_i1        ),
-        .raddr1_i2 (rs_i2        ),
-        .raddr2_i2 (rt_i2        ),
-        .rdata1_i1 (rf_rdata1_i1 ),
-        .rdata2_i1 (rf_rdata2_i1 ),
-        .rdata1_i2 (rf_rdata1_i2 ),
-        .rdata2_i2 (rf_rdata2_i2 )
+    	.clk       (clk             ),
+        .we_i1     (wb_rf_we        ),
+        .we_i2     (wb_rf_we_i2     ),
+        .waddr_i1  (wb_rf_waddr     ),
+        .waddr_i2  (wb_rf_waddr_i2  ),
+        .wdata_i1  (wb_rf_wdata     ),
+        .wdata_i2  (wb_rf_wdata_i2  ),
+        .raddr1_i1 (rs_i1           ),
+        .raddr2_i1 (rt_i1           ),
+        .raddr1_i2 (rs_i2           ),
+        .raddr2_i2 (rt_i2           ),
+        .rdata1_i1 (rf_rdata1_i1    ),
+        .rdata2_i1 (rf_rdata2_i1    ),
+        .rdata1_i2 (rf_rdata1_i2    ),
+        .rdata2_i2 (rf_rdata2_i2    )
     );
 
     hilo_reg u_hilo_reg(
@@ -342,7 +382,7 @@ module ID(
     wire inst1_valid, inst2_valid;
 
     assign inst1_valid = able_to_launch ? 1'b1 : 1'b0;
-    assign inst2_valid = (launch_mode==`DualIssue && able_to_launch) ? 1'b1 : 1'b0;
+    assign inst2_valid = (launch_mode==`DualIssue && (able_to_launch)) ? 1'b1 : 1'b0;
     
     assign br_bus = br_bus1[32] & inst1_valid ? br_bus1[32:0] :
                     br_bus2[32] & inst2_valid ? br_bus2[32:0] : 33'b0 ;
