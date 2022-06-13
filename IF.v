@@ -19,8 +19,9 @@ module IF(
     reg [31:0] pc_reg;
     reg ce_reg;// 是否取址
     reg discard_following_inst;// 如果当前需要跳转则让FIFO忽略其要接收的两条指令
-    wire [31:0] next_pc;
+    
     wire br_e;
+    wire [31:0] next_pc;
     wire [31:0] br_addr;
 
     assign {
@@ -65,7 +66,6 @@ module IF(
                      br_e ? br_addr : 
                      pc_reg + 32'd8;
 
-    
     assign inst_sram_en = ce_reg;
     assign inst_sram_wen = 4'b0;
     assign inst_sram_addr = pc_reg;

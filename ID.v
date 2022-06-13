@@ -48,10 +48,6 @@ module ID(
             buf_inst <= inst_sram_rdata;
         end
     end
-  
-    wire ce, discard_current_inst;
-    wire [31:0] id_pc;
-    assign {discard_current_inst, ce, id_pc} = if_to_id_bus_r;
 
 
 // FIFO inst buffer
@@ -69,7 +65,34 @@ module ID(
     wire launched; 
     wire launch_mode;
     wire inst2_is_br;
-    reg launch_r, br_en_r;
+    reg launch_r;
+      
+    wire ce, discard_current_inst;
+    wire [31:0] id_pc;
+    wire matched, inst1_matched, inst2_matched;
+    reg [31:0] pc_to_match;
+    reg match_pc_en;
+
+    assign {discard_current_inst, ce, id_pc} = if_to_id_bus_r;
+    always @(posedge clk) begin
+        if (rst) begin
+            match_pc_en <= 1'b0;
+            pc_to_match <= 32'b0;
+        end
+        else if(br_bus[32] & ~match_pc_en) begin
+            pc_to_match <= br_bus[31:0];
+        end
+        else if(discard_current_inst & ~match_pc_en) begin
+            match_pc_en <= 1'b1;
+        end
+    end
+
+    always @(posedge clk) begin
+        if(match_pc_en & matched) begin
+            match_pc_en <= 1'b0;
+            pc_to_match <= 32'b0;
+        end
+    end
 
     assign inst1_in = inst_sram_rdata[31: 0];
     assign inst2_in = inst_sram_rdata[63:32];
@@ -77,16 +100,20 @@ module ID(
     assign inst1_in_pc = id_pc;
     assign inst2_in_pc = id_pc+32'd4;
 
-    assign inst1_in_val = ~ce                  ? 1'b0 :
-                          id_pc   == 32'b0     ? 1'b0 :
-                        //   stall[1]==`Stop      ? 1'b0 : 
-                          discard_current_inst ? 1'b0 : 1'b1;
-    assign inst2_in_val = ~ce                  ? 1'b0 :
-                          id_pc   == 32'b0     ? 1'b0 :
-                        //   stall[1]==`Stop      ? 1'b0 : 
-                          discard_current_inst ? 1'b0 : 1'b1;
+    assign inst1_matched = ~match_pc_en | (match_pc_en && inst1_in_pc==pc_to_match);
+    assign inst2_matched = ~match_pc_en | (match_pc_en && inst2_in_pc==pc_to_match);
+    assign matched = inst1_matched | inst2_matched;
 
-    assign stallreq_for_fifo = fifo_full;
+    assign inst1_in_val = ~ce                  ? 1'b0 :
+                          id_pc == 32'b0       ? 1'b0 :
+                          discard_current_inst ? 1'b0 : 
+                          ~inst1_matched       ? 1'b0 : 1'b1;
+    assign inst2_in_val = ~ce                  ? 1'b0 :
+                          id_pc == 32'b0       ? 1'b0 :
+                          discard_current_inst ? 1'b0 : 
+                          ~matched             ? 1'b0 : 1'b1;
+
+    assign stallreq_for_fifo = fifo_full & ~br_bus[32];// 队满时要发射的如果恰好是跳转则不能stall 要让IF取址(队列已留出冗余,不会真的爆)
 
     Instbuffer FIFO_buffer(
         .clk                  (clk               ),

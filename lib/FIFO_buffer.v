@@ -69,6 +69,12 @@ module Instbuffer(
             FIFO_valid[tail] <= `Valid;
             tail <= tail + 1;
         end 
+        else if(ICache_inst1_valid_i == `Invalid && ICache_inst2_valid_i == `Valid) begin
+            FIFO_data[tail] <= ICache_inst2_i;
+            FIFO_addr[tail] <= ICache_inst2_addr_i; //bpu_select_i ? {ICache_inst1_addr_i,33'd0} : {ICache_inst1_addr_i,bpu_predict_info_i};
+            FIFO_valid[tail] <= `Valid;
+            tail <= tail + 1;
+        end 
         else if(ICache_inst1_valid_i == `Valid && ICache_inst2_valid_i == `Valid) begin 
             FIFO_data[tail] <= ICache_inst1_i;
             FIFO_data[tail+`InstBufferSizeLog2'h1] <= ICache_inst2_i;
