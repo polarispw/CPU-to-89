@@ -36,16 +36,12 @@ module ID(
             if_to_id_bus_r <= `IF_TO_ID_WD'b0;
         end
         else if (stall[1]==`Stop && stall[2]==`NoStop) begin
-            if_to_id_bus_r <= if_to_id_bus;//考虑stall
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;//考虑stall
             flag <= 1'b0;
         end
         else if (stall[1]==`NoStop) begin
             if_to_id_bus_r <= if_to_id_bus;
             flag <= 1'b0;
-        end
-        else if (stall[1]==`Stop && stall[2]==`Stop && ~flag) begin
-            flag <= 1'b1;
-            buf_inst <= inst_sram_rdata;
         end
     end
 
@@ -65,6 +61,7 @@ module ID(
     wire launched; 
     wire launch_mode;
     wire inst2_is_br;
+    wire stop_pop;
     reg launch_r;
       
     wire ce, discard_current_inst;
@@ -119,7 +116,7 @@ module ID(
         .clk                  (clk               ),
         .rst                  (rst               ),
         .flush                (flush | br_bus[32]),
-        .stall                (stall[1]          ), 
+        .stall                (stop_pop          ), 
         .issue_i              (launch_r          ),
         .issue_mode_i         (launch_mode       ),
         .ICache_inst1_i       (inst1_in          ),
@@ -371,6 +368,8 @@ module ID(
             launch_r <= launched;
         end
     end
+
+    assign stop_pop = stall[2] | inst1_info[28] | inst1_info[29];// stall或发射除法后不再弹出
 
 
 // output part

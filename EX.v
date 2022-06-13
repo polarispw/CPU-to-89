@@ -27,10 +27,10 @@ module EX(
         else if (flush) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
         end
-        else if (stall[2]==`Stop && stall[3]==`NoStop) begin
+        else if (stall[3]==`Stop && stall[4]==`NoStop) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
         end
-        else if (stall[2]==`NoStop) begin
+        else if (stall[3]==`NoStop) begin
             id_to_ex_bus_r <= id_to_ex_bus;
         end
     end

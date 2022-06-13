@@ -17,16 +17,16 @@ module CTRL(
             stall = `StallBus'b0;
         end
         else if (stallreq_for_ex) begin
-            stall = `StallBus'b001111;
+            stall = `StallBus'b111_101;
         end
         else if (stallreq_for_bru | stallreq_for_cp0) begin
-            stall = `StallBus'b000111;
+            stall = `StallBus'b001_111;
         end
         else if (stallreq_for_load) begin
-            stall = `StallBus'b000011;
+            stall = `StallBus'b000_101;
         end
         else if (stallreq_for_fifo) begin
-            stall = `StallBus'b000001;
+            stall = `StallBus'b000_001;
         end
         else begin
             stall = `StallBus'b0;

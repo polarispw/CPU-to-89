@@ -19,10 +19,10 @@ module MEM(
         if (rst | flush) begin
             ex_to_mem_bus_r <= {`EX_TO_MEM_WD*2'b0,1'b0};
         end
-        else if (stall[3]==`Stop && stall[4]==`NoStop) begin
+        else if (stall[4]==`Stop && stall[5]==`NoStop) begin
             ex_to_mem_bus_r <= {`EX_TO_MEM_WD*2'b0,1'b0};
         end
-        else if (stall[3]==`NoStop) begin
+        else if (stall[4]==`NoStop) begin
             ex_to_mem_bus_r <= ex_to_mem_bus;
         end
     end
