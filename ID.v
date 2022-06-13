@@ -36,7 +36,7 @@ module ID(
             if_to_id_bus_r <= `IF_TO_ID_WD'b0;
         end
         else if (stall[1]==`Stop && stall[2]==`NoStop) begin
-            if_to_id_bus_r <= `IF_TO_ID_WD'b0;
+            if_to_id_bus_r <= if_to_id_bus;
             flag <= 1'b0;
         end
         else if (stall[1]==`NoStop) begin
@@ -68,25 +68,31 @@ module ID(
 
     wire launched; 
     wire launch_mode;
-    wire able_to_launch;
+    wire inst2_is_br;
     reg launch_r, br_en_r;
 
-    assign inst1_in = ce & ~discard_current_inst ? inst_sram_rdata[31: 0] : 32'b0;
-    assign inst2_in = ce & ~discard_current_inst ? inst_sram_rdata[63:32] : 32'b0;
+    assign inst1_in = inst_sram_rdata[31: 0];
+    assign inst2_in = inst_sram_rdata[63:32];
 
-    assign inst1_in_pc = ce & ~discard_current_inst ? id_pc : 32'b0;
-    assign inst2_in_pc = ce & ~discard_current_inst ? id_pc+32'd4 : 32'b0;
+    assign inst1_in_pc = id_pc;
+    assign inst2_in_pc = id_pc+32'd4;
 
-    assign inst1_in_val = id_pc   == 32'b0 ? 1'b0 :
-                          stall[1]==`Stop  ? 1'b0 : 
-                          ~ce ? 1'b0 : 1'b1;
-    assign inst2_in_val = id_pc   == 32'b0 ? 1'b0 :
-                          stall[1]==`Stop  ? 1'b0 : 
-                          ~ce ? 1'b0 : 1'b1;
+    assign inst1_in_val = ~ce                  ? 1'b0 :
+                          id_pc   == 32'b0     ? 1'b0 :
+                        //   stall[1]==`Stop      ? 1'b0 : 
+                          discard_current_inst ? 1'b0 : 1'b1;
+    assign inst2_in_val = ~ce                  ? 1'b0 :
+                          id_pc   == 32'b0     ? 1'b0 :
+                        //   stall[1]==`Stop      ? 1'b0 : 
+                          discard_current_inst ? 1'b0 : 1'b1;
+
+    assign stallreq_for_fifo = fifo_full;
+
     Instbuffer FIFO_buffer(
         .clk                  (clk               ),
         .rst                  (rst               ),
         .flush                (flush | br_bus[32]),
+        .stall                (stall[1]          ), 
         .issue_i              (launch_r          ),
         .issue_mode_i         (launch_mode       ),
         .ICache_inst1_i       (inst1_in          ),
@@ -232,39 +238,11 @@ module ID(
         .ex_rf_waddr      (ex_rf_waddr      ),
         .inst_info        (inst2_info       ),
         .br_bus           (br_bus2          ),
+        .next_is_delayslot(inst2_is_br      ),
         // .stallreq_for_load(stallreq_for_load),
         // .stallreq_for_cp0 (stallreq_for_cp0 ),
         .inst_flag        (inst_flag2       )
     );
-
-// launch check
-
-    assign sel_i1_src1 = inst1_info[15:13];
-    assign sel_i2_src1 = inst2_info[15:13];
-    assign sel_i1_src2 = inst1_info[12:9];
-    assign sel_i2_src2 = inst2_info[12:9];
-    assign rf_we_i1    = inst1_info[6];
-    assign rf_we_i2    = inst2_info[6];
-    assign rf_waddr_i1 = inst1_info[5:1];
-    assign rf_waddr_i2 = inst2_info[5:1];
-
-    assign data_corelate = (sel_i1_src1[0] & rf_we_i2 & (rf_waddr_i2==rs_i1)) | // i1 read reg[rs] & i2 write reg[rs]
-                           (sel_i1_src2[0] & rf_we_i2 & (rf_waddr_i2==rt_i1)) | // i1 read reg[rt] & i2 write reg[rt]
-                           (sel_i2_src1[0] & rf_we_i1 & (rf_waddr_i1==rs_i2)) | // i2 read reg[rs] & i1 write reg[rs]
-                           (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
-
-    assign inst_conflict = (inst_flag1[2:0]!=3'b0) && (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
-    assign launch_mode = (data_corelate | inst_conflict) ? `SingleIssue : `DualIssue;
-    assign launched = inst1_valid & ~stall[1] ? 1'b1 : 1'b0; // 这里要优化
-
-    always@(*)begin
-        if(rst|flush) begin
-            launch_r <= 1'b0;
-        end
-        else begin
-            launch_r <= launched;
-        end
-    end
 
 
 // operate regfile
@@ -335,14 +313,45 @@ module ID(
                       wb_lo_we  ? wb_lo_i  : lo_o;
 
 
+// launch check
+
+    assign sel_i1_src1 = inst1_info[15:13];
+    assign sel_i2_src1 = inst2_info[15:13];
+    assign sel_i1_src2 = inst1_info[12:9];
+    assign sel_i2_src2 = inst2_info[12:9];
+    assign rf_we_i1    = inst1_info[6];
+    assign rf_we_i2    = inst2_info[6];
+    assign rf_waddr_i1 = inst1_info[5:1];
+    assign rf_waddr_i2 = inst2_info[5:1];
+
+    assign data_corelate = (sel_i1_src1[0] & rf_we_i2 & (rf_waddr_i2==rs_i1)) | // i1 read reg[rs] & i2 write reg[rs]
+                           (sel_i1_src2[0] & rf_we_i2 & (rf_waddr_i2==rt_i1)) | // i1 read reg[rt] & i2 write reg[rt]
+                           (sel_i2_src1[0] & rf_we_i1 & (rf_waddr_i1==rs_i2)) | // i2 read reg[rs] & i1 write reg[rs]
+                           (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
+
+    assign inst_conflict = (inst_flag1[2:0]!=3'b0) || (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
+    assign launch_mode = (data_corelate | inst_conflict) ? `SingleIssue : 
+                         inst2_is_br  ? `SingleIssue : 
+                         ~inst2_valid ? `SingleIssue : `DualIssue;     
+    assign launched = inst1_valid | inst2_valid; // 这里要再考虑
+
+    always@(*)begin
+        if(rst|flush) begin
+            launch_r <= 1'b0;
+        end
+        else begin
+            launch_r <= launched;
+        end
+    end
+
+
 // output part
 
     wire [`INST_BUS_WD-1:0] inst1_bus, inst2_bus;
     wire inst1_launch = inst1_valid;
-    wire inst2_launch = (launch_mode == `DualIssue) && inst2_valid;
+    wire inst2_launch = (launch_mode == `DualIssue);
     
-    assign br_bus = br_bus1[32] & inst1_launch ? br_bus1[32:0] :
-                    br_bus2[32] & inst2_launch ? br_bus2[32:0] : 33'b0 ;
+    assign br_bus = br_bus1[32] & inst1_launch ? br_bus1[32:0] : 33'b0 ;
 
     assign inst1_bus = {
         inst1_info[58:28],// 250:220

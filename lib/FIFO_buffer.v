@@ -1,8 +1,9 @@
 `include "defines.vh"
 module Instbuffer(
-    input   clk,
-    input   rst,
-    input   flush,
+    input clk,
+    input rst,
+    input flush,
+    input stall,
 
     //launch
     input  wire issue_mode_i,                     //issue mode of issue stage
@@ -37,14 +38,15 @@ module Instbuffer(
     reg [`InstBufferSizeLog2-1:0]tail; //当前正在写入的数据位置
     reg [`InstBufferSizeLog2-1:0]head; //当前读取指令的首位置
     reg [`InstBufferSize-1:0]FIFO_valid; //buffer中每个位置的数据是否有效（高电平有效）
+    reg stall_r;
 
+    // pop after launching
     always@(posedge clk)begin
-        
+        stall_r <= stall;
         if(rst|flush)begin
             head <= `InstBufferSizeLog2'h0;
 			FIFO_valid <= `InstBufferSize'h0;
         end
-		// pop after launching
         else if( issue_i == `Valid && issue_mode_i == `SingleIssue )begin//pop one inst
             FIFO_valid[head] <= `Invalid;
 			head <= head + 1;
@@ -54,7 +56,6 @@ module Instbuffer(
 			FIFO_valid[head+`InstBufferSizeLog2'h1] <= `Invalid;
             head <= head + 2;
 		end
-		
     end
 	
 	// push back inst
@@ -80,14 +81,14 @@ module Instbuffer(
     end	
 	   
 //output	
-	assign issue_inst1_o       =  FIFO_data[head]; 
-	assign issue_inst2_o       =  FIFO_data[head+`InstBufferSizeLog2'h1];
+	assign issue_inst1_o       = stall_r ? 32'b0 : FIFO_data[head]; 
+	assign issue_inst2_o       = stall_r ? 32'b0 : FIFO_data[head+`InstBufferSizeLog2'h1];
 	
-	assign issue_inst1_addr_o  =  FIFO_addr[head];
-	assign issue_inst2_addr_o  =  FIFO_addr[head+`InstBufferSizeLog2'h1];
+	assign issue_inst1_addr_o  = stall_r ? 32'b0 : FIFO_addr[head];
+	assign issue_inst2_addr_o  = stall_r ? 32'b0 : FIFO_addr[head+`InstBufferSizeLog2'h1];
 
-    assign issue_inst1_valid_o = FIFO_valid[head];
-    assign issue_inst2_valid_o = FIFO_valid[head+`InstBufferSizeLog2'h1];
+    assign issue_inst1_valid_o = stall_r ? 1'b0 : FIFO_valid[head];
+    assign issue_inst2_valid_o = stall_r ? 1'b0 : FIFO_valid[head+`InstBufferSizeLog2'h1];
 
 	assign buffer_full_o       = FIFO_valid[tail+`InstBufferSizeLog2'h5];
 

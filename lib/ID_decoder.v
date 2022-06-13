@@ -12,6 +12,7 @@ module decoder(
     output wire [58:0] inst_info,
 
     output wire [32:0] br_bus,
+    output wire next_is_delayslot,
     output wire stallreq_for_load,
     output wire stallreq_for_cp0,
     output wire [2:0] inst_flag
@@ -178,7 +179,7 @@ module decoder(
     assign sel_alu_src1[0] = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
                            | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_addi | inst_sub 
                            | inst_and | inst_andi | inst_nor | inst_xori | inst_sllv | inst_srav | inst_srlv
-                           | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_jr | inst_jalr;
+                           | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh;
 
     // pc to reg1
     assign sel_alu_src1[1] = inst_jal | inst_bltzal | inst_bgezal | inst_jalr;
@@ -312,11 +313,10 @@ module decoder(
                    : inst_jal   ? {id_pc[31:28],instr_index,2'b0} 
                    : inst_jalr  ? rdata1 : 32'b0;
 
-    wire next_inst_in_delayslot;
     reg is_in_delayslot;
-    assign next_inst_in_delayslot = inst_beq  | inst_bne  | inst_bgez   | inst_bgtz   |
-                                    inst_blez | inst_bltz | inst_bltzal | inst_bgezal |
-                                    inst_j    | inst_jr   | inst_jal    | inst_jalr   ? 1'b1 : 1'b0;
+    assign next_is_delayslot = inst_beq  | inst_bne  | inst_bgez   | inst_bgtz   |
+                               inst_blez | inst_bltz | inst_bltzal | inst_bgezal |
+                               inst_j    | inst_jr   | inst_jal    | inst_jalr   ? 1'b1 : 1'b0;
 
     assign br_bus = {
         br_e,
