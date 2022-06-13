@@ -5,7 +5,7 @@ module MEM(
     input wire flush,
     input wire [`StallBus-1:0] stall,
 
-    input wire [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus,
+    input wire [`EX_TO_MEM_WD*2:0] ex_to_mem_bus,
     input wire [31:0] data_sram_rdata,
 
     output wire [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus,
@@ -13,17 +13,14 @@ module MEM(
     output wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus
 );
 
-    reg [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus_r;
+    reg [`EX_TO_MEM_WD*2:0] ex_to_mem_bus_r;
 
     always @ (posedge clk) begin
-        if (rst) begin
-            ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
-        end
-        else if (flush) begin
-            ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
+        if (rst | flush) begin
+            ex_to_mem_bus_r <= {`EX_TO_MEM_WD*2'b0,1'b0};
         end
         else if (stall[3]==`Stop && stall[4]==`NoStop) begin
-            ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
+            ex_to_mem_bus_r <= {`EX_TO_MEM_WD*2'b0,1'b0};
         end
         else if (stall[3]==`NoStop) begin
             ex_to_mem_bus_r <= ex_to_mem_bus;
@@ -118,6 +115,7 @@ module MEM(
 
 // output
     wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
+    wire switch;
 
     assign mem_to_wb_bus_i1 = {
         hilo_bus,   // 135:70
@@ -134,11 +132,9 @@ module MEM(
         rf_wdata_i2
     };
 
+    assign switch = ex_to_mem_bus_r[334];
     assign mem_to_wb_bus = to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
-    {
-        mem_to_wb_bus_i2,
-        mem_to_wb_bus_i1
-    };
+                           switch        ? {mem_to_wb_bus_i1, mem_to_wb_bus_i2} : {mem_to_wb_bus_i2, mem_to_wb_bus_i1};
 
     assign mem_to_rf_bus = {
         hilo_bus_i2,

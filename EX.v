@@ -8,7 +8,7 @@ module EX(
 
     input wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
 
-    output wire [`EX_TO_MEM_WD*2-1:0] ex_to_mem_bus,
+    output wire [`EX_TO_MEM_WD*2:0] ex_to_mem_bus,
 
     output wire [`EX_TO_RF_WD*2-1:0] ex_to_rf_bus,
 
@@ -37,6 +37,7 @@ module EX(
 
     wire [`INST_BUS_WD-1:0] inst1_bus, inst2_bus;
     wire inst1_valid, inst2_valid;
+    wire switch;
 
     wire stallreq_for_ex_i1, stallreq_for_ex_i2;
     wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus_i1, ex_to_mem_bus_i2;
@@ -48,8 +49,9 @@ module EX(
     wire [31:0] data_sram_wdata_i1, data_sram_wdata_i2;
 
     assign {inst2_valid, inst1_valid} = id_to_ex_bus_r[1:0];
-    assign inst1_bus = inst1_valid ? id_to_ex_bus_r[253:2]   : `INST_BUS_WD'b0;
-    assign inst2_bus = inst2_valid ? id_to_ex_bus_r[505:254] : `INST_BUS_WD'b0;
+    assign inst1_bus = inst1_valid ? id_to_ex_bus_r[252:2]   : `INST_BUS_WD'b0;
+    assign inst2_bus = inst2_valid ? id_to_ex_bus_r[503:253] : `INST_BUS_WD'b0;
+    assign switch = id_to_ex_bus_r[504];
 
     sub_ex u1_sub_ex(
         .flush          (flush             ),
@@ -83,6 +85,7 @@ module EX(
 // output
 
     assign ex_to_mem_bus = {
+        switch,
         ex_to_mem_bus_i2,
         ex_to_mem_bus_i1
     };

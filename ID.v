@@ -357,7 +357,8 @@ module ID(
                            (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
 
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) || (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
-    assign launch_mode = (data_corelate | inst_conflict) ? `SingleIssue : 
+    assign launch_mode = br_bus1[32]  ? `DualIssue :
+                         (data_corelate | inst_conflict) ? `SingleIssue : 
                          inst2_is_br  ? `SingleIssue : 
                          ~inst2_valid ? `SingleIssue : `DualIssue;     
     assign launched = inst1_valid | inst2_valid; // 这里要再考虑
@@ -377,8 +378,10 @@ module ID(
     wire [`INST_BUS_WD-1:0] inst1_bus, inst2_bus;
     wire inst1_launch = inst1_valid;
     wire inst2_launch = (launch_mode == `DualIssue);
+    wire switch;
     
     assign br_bus = br_bus1[32] & inst1_launch ? br_bus1[32:0] : 33'b0 ;
+    assign switch = br_bus[32];
 
     assign inst1_bus = {
         inst1_info[58:28],// 250:220
@@ -419,11 +422,7 @@ module ID(
         // rdata1,         // 63:32
         // rdata2          // 31:0
 
-    assign id_to_ex_bus = {
-        inst2_bus,
-        inst1_bus,
-        inst2_launch,
-        inst1_launch
-    };
+    assign id_to_ex_bus = switch ? {switch, inst1_bus, inst2_bus, inst1_launch, inst2_launch} :
+                                   {switch, inst2_bus, inst1_bus, inst2_launch, inst1_launch} ;
 
 endmodule
