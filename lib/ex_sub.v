@@ -1,5 +1,7 @@
 `include "defines.vh"
 module sub_ex(
+    input wire rst,
+    input wire clk,
     input wire flush,
     input wire [`INST_BUS_WD-1:0] inst_bus,
 

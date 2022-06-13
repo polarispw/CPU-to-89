@@ -54,9 +54,11 @@ module EX(
     assign switch = id_to_ex_bus_r[504];
 
     sub_ex u1_sub_ex(
+        .rst            (rst               ),
+        .clk            (clk               ),
         .flush          (flush             ),
         .inst_bus       (inst1_bus         ),
-        .stallreq_for_ex(stallreq_for_ex_i1),
+        .stallreq_for_ex(stallreq_for_ex   ),
         .ex_to_mem_bus  (ex_to_mem_bus_i1  ),
         .ex_to_rf_bus   (ex_to_rf_bus_i1   ),
         .data_sram_en   (data_sram_en_i1   ),
@@ -66,6 +68,8 @@ module EX(
     );// 除了跳转
 
     sub_ex u2_sub_ex(
+        .rst            (rst               ),
+        .clk            (clk               ),
         .flush          (flush             ),
         .inst_bus       (inst2_bus         ),
         .stallreq_for_ex(stallreq_for_ex_i2),

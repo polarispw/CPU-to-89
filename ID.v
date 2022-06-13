@@ -36,7 +36,7 @@ module ID(
             if_to_id_bus_r <= `IF_TO_ID_WD'b0;
         end
         else if (stall[1]==`Stop && stall[2]==`NoStop) begin
-            if_to_id_bus_r <= if_to_id_bus;
+            if_to_id_bus_r <= if_to_id_bus;//考虑stall
             flag <= 1'b0;
         end
         else if (stall[1]==`NoStop) begin
