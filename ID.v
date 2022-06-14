@@ -306,44 +306,45 @@ module ID(
 
     // bypass corelation
     assign rdata1_i1 = (ex_rf_we     & (ex_rf_waddr     == rs_i1))  ? ex_rf_wdata     :
-                       (mem_rf_we    & (mem_rf_waddr    == rs_i1))  ? mem_rf_wdata    :
-                       (wb_rf_we     & (wb_rf_waddr     == rs_i1))  ? wb_rf_wdata     : 
                        (ex_rf_we_i2  & (ex_rf_waddr_i2  == rs_i1))  ? ex_rf_wdata_i2  :
+                       (mem_rf_we    & (mem_rf_waddr    == rs_i1))  ? mem_rf_wdata    :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rs_i1))  ? mem_rf_wdata_i2 :
+                       (wb_rf_we     & (wb_rf_waddr     == rs_i1))  ? wb_rf_wdata     : 
                        (wb_rf_we_i2  & (wb_rf_waddr_i2  == rs_i1))  ? wb_rf_wdata_i2  :  rf_rdata1_i1;
 
     assign rdata2_i1 = (ex_rf_we     & (ex_rf_waddr     == rt_i1))  ? ex_rf_wdata     :
-                       (mem_rf_we    & (mem_rf_waddr    == rt_i1))  ? mem_rf_wdata    :
-                       (wb_rf_we     & (wb_rf_waddr     == rt_i1))  ? wb_rf_wdata     : 
                        (ex_rf_we_i2  & (ex_rf_waddr_i2  == rt_i1))  ? ex_rf_wdata_i2  :
+                       (mem_rf_we    & (mem_rf_waddr    == rt_i1))  ? mem_rf_wdata    :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rt_i1))  ? mem_rf_wdata_i2 :
+                       (wb_rf_we     & (wb_rf_waddr     == rt_i1))  ? wb_rf_wdata     : 
                        (wb_rf_we_i2  & (wb_rf_waddr_i2  == rt_i1))  ? wb_rf_wdata_i2  :  rf_rdata2_i1;
 
     assign rdata1_i2 = (ex_rf_we     & (ex_rf_waddr     == rs_i2))  ? ex_rf_wdata     :
-                       (mem_rf_we    & (mem_rf_waddr    == rs_i2))  ? mem_rf_wdata    :
-                       (wb_rf_we     & (wb_rf_waddr     == rs_i2))  ? wb_rf_wdata     : 
                        (ex_rf_we_i2  & (ex_rf_waddr_i2  == rs_i2))  ? ex_rf_wdata_i2  :
+                       (mem_rf_we    & (mem_rf_waddr    == rs_i2))  ? mem_rf_wdata    :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rs_i2))  ? mem_rf_wdata_i2 :
+                       (wb_rf_we     & (wb_rf_waddr     == rs_i2))  ? wb_rf_wdata     : 
                        (wb_rf_we_i2  & (wb_rf_waddr_i2  == rs_i2))  ? wb_rf_wdata_i2  :  rf_rdata1_i2;
 
     assign rdata2_i2 = (ex_rf_we     & (ex_rf_waddr     == rt_i2))  ? ex_rf_wdata     :
-                       (mem_rf_we    & (mem_rf_waddr    == rt_i2))  ? mem_rf_wdata    :
-                       (wb_rf_we     & (wb_rf_waddr     == rt_i2))  ? wb_rf_wdata     : 
                        (ex_rf_we_i2  & (ex_rf_waddr_i2  == rt_i2))  ? ex_rf_wdata_i2  :
+                       (mem_rf_we    & (mem_rf_waddr    == rt_i2))  ? mem_rf_wdata    :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rt_i2))  ? mem_rf_wdata_i2 :
+                       (wb_rf_we     & (wb_rf_waddr     == rt_i2))  ? wb_rf_wdata     :
                        (wb_rf_we_i2  & (wb_rf_waddr_i2  == rt_i2))  ? wb_rf_wdata_i2  :  rf_rdata2_i2;
 
     assign hi_rdata = ex_hi_we     ? ex_hi_i     :
-                      mem_hi_we    ? mem_hi_i    :
-                      wb_hi_we     ? wb_hi_i     : 
                       ex_hi_we_i2  ? ex_hi_i2_i  :
+                      mem_hi_we    ? mem_hi_i    :
                       mem_hi_we_i2 ? mem_hi_i2_i :
+                      wb_hi_we     ? wb_hi_i     : 
                       wb_hi_we_i2  ? wb_hi_i2_i  : hi_o;
+
     assign lo_rdata = ex_lo_we     ? ex_lo_i     :
-                      mem_lo_we    ? mem_lo_i    :
-                      wb_lo_we     ? wb_lo_i     :
                       ex_lo_we_i2  ? ex_lo_i2_i  :
+                      mem_lo_we    ? mem_lo_i    :
                       mem_lo_we_i2 ? mem_lo_i2_i :
+                      wb_lo_we     ? wb_lo_i     :
                       wb_lo_we_i2  ? wb_lo_i2_i  : lo_o;
 
 
