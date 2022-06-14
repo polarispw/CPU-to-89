@@ -3,10 +3,14 @@ module hilo_reg(
     input wire clk,
     input wire rst,
 
-    input wire hi_we,
-    input wire lo_we,
-    input wire [31:0] hi_i,
-    input wire [31:0] lo_i,
+    input wire hi_we_i1,
+    input wire lo_we_i1,
+    input wire hi_we_i2,
+    input wire lo_we_i2,
+    input wire [31:0] hi_i_i1,
+    input wire [31:0] lo_i_i1,
+    input wire [31:0] hi_i_i2,
+    input wire [31:0] lo_i_i2,
 
     output wire [31:0] hi_o,
     output wire [31:0] lo_o
@@ -20,15 +24,25 @@ module hilo_reg(
             hi_reg <= 32'b0;
             lo_reg <= 32'b0;
         end
-        else if (hi_we & lo_we) begin
-            hi_reg <= hi_i;
-            lo_reg <= lo_i;
+        else if (hi_we_i1 & lo_we_i1) begin
+            hi_reg <= hi_i_i1;
+            lo_reg <= lo_i_i1;
         end
-        else if (hi_we & ~lo_we) begin
-            hi_reg <= hi_i;
+        else if (hi_we_i1 & ~lo_we_i1) begin
+            hi_reg <= hi_i_i1;
         end 
-        else if (~hi_we & lo_we) begin
-            lo_reg <= lo_i;
+        else if (~hi_we_i1 & lo_we_i1) begin
+            lo_reg <= lo_i_i1;
+        end
+        else if (hi_we_i2 & lo_we_i2) begin
+            hi_reg <= hi_i_i2;
+            lo_reg <= lo_i_i2;
+        end
+        else if (hi_we_i2 & ~lo_we_i2) begin
+            hi_reg <= hi_i_i2;
+        end 
+        else if (~hi_we_i1 & lo_we_i1) begin
+            lo_reg <= lo_i_i2;
         end
     end
 

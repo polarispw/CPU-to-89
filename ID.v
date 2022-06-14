@@ -290,14 +290,18 @@ module ID(
     );
 
     hilo_reg u_hilo_reg(
-    	.clk   (clk      ),
-        .rst   (rst      ),
-        .hi_we (wb_hi_we ),
-        .hi_i  (wb_hi_i  ),
-        .lo_we (wb_lo_we ),
-        .lo_i  (wb_lo_i  ),
-        .hi_o  (hi_o     ),
-        .lo_o  (lo_o     )
+    	.clk     (clk        ),
+        .rst     (rst        ),
+        .hi_we_i1(wb_hi_we   ),
+        .lo_we_i1(wb_lo_we   ),
+        .hi_we_i2(wb_hi_we_i2),
+        .lo_we_i2(wb_lo_we_i2),
+        .hi_i_i1 (wb_hi_i    ),
+        .lo_i_i1 (wb_lo_i    ),
+        .hi_i_i2 (wb_hi_i2_i ),
+        .lo_i_i2 (wb_lo_i2_i ),
+        .hi_o    (hi_o       ),
+        .lo_o    (lo_o       )
     );//改双线
 
     // bypass corelation
