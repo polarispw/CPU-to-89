@@ -9,7 +9,7 @@ module decoder(
     input wire last_inst_is_mfc0,
     input wire [4:0] ex_rf_waddr,
 
-    output wire [58:0] inst_info,
+    output wire [59:0] inst_info,
 
     output wire [32:0] br_bus,
     output wire next_is_delayslot,
@@ -139,7 +139,7 @@ module decoder(
     assign inst_xor     = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0110];
     assign inst_xori    = op_d[6'b00_1110];
     assign inst_sllv    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0100];
-    assign inst_sll     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0000] & !((ce == 1'b0) && (id_pc == 32'b0));
+    assign inst_sll     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0000];// & !((ce == 1'b0) && (id_pc == 32'b0));
     assign inst_srav    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0111];
     assign inst_sra     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0011];
     assign inst_srlv    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0110];
@@ -355,7 +355,7 @@ module decoder(
     assign except_of_overflow = 1'b0;
     assign except_of_syscall = inst_syscall;
     assign except_of_break = inst_break;
-    assign except_of_invalid_inst = ~inst_valid & ce;
+    assign except_of_invalid_inst = ~inst_valid;
 
     assign excepttype = {inst[15:11]      , delay_slot,
                          except_of_pc_addr, adel, ades, except_of_overflow, 
@@ -364,7 +364,7 @@ module decoder(
     
 //output
     assign inst_info = {
-        excepttype,     // 58:44
+        excepttype,     // 59:44
         mem_op,         // 43:36
         hilo_op,        // 35:28
         alu_op,         // 27:16

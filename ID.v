@@ -79,7 +79,7 @@ module ID(
         else if(br_bus[32] & ~match_pc_en) begin
             pc_to_match <= br_bus[31:0];
         end
-        else if(discard_current_inst & ~match_pc_en) begin
+        else if(discard_current_inst & ~match_pc_en & (pc_to_match[1:0]==2'b0)) begin
             match_pc_en <= 1'b1;
         end
     end
@@ -95,7 +95,7 @@ module ID(
     assign inst2_in = inst_sram_rdata[63:32];
 
     assign inst1_in_pc = id_pc;
-    assign inst2_in_pc = id_pc+32'd4;
+    assign inst2_in_pc = inst1_in_val ? id_pc+32'd4 : pc_idef;
 
     assign inst1_matched = ~match_pc_en | (match_pc_en && inst1_in_pc==pc_to_match);
     assign inst2_matched = ~match_pc_en | (match_pc_en && inst2_in_pc==pc_to_match);
@@ -210,7 +210,7 @@ module ID(
 
 // decode instructions
 
-    wire [58:0] inst1_info, inst2_info;
+    wire [59:0] inst1_info, inst2_info;
     wire [32:0] br_bus1, br_bus2;
     wire [2:0] inst_flag1, inst_flag2;
     wire [4:0] rs_i1, rs_i2, rt_i1, rt_i2;
@@ -370,6 +370,8 @@ module ID(
     assign launch_mode = br_bus1[32]  ? `DualIssue :
                          (data_corelate | inst_conflict) ? `SingleIssue : 
                          inst2_is_br  ? `SingleIssue : 
+                         inst2_info[53] ? `SingleIssue :
+                         inst2_info[47] ? `SingleIssue :
                          ~inst2_valid ? `SingleIssue : `DualIssue;     
     assign launched = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
 
