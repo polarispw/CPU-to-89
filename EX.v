@@ -88,11 +88,8 @@ module EX(
     
 // output
 
-    assign ex_to_mem_bus = {
-        switch,
-        ex_to_mem_bus_i2,
-        ex_to_mem_bus_i1
-    };
+    assign ex_to_mem_bus = switch ? {switch, ex_to_mem_bus_i1, ex_to_mem_bus_i2} :
+                                    {switch, ex_to_mem_bus_i2, ex_to_mem_bus_i1} ;
 
     assign ex_to_rf_bus = {
         ex_to_rf_bus_i2,
