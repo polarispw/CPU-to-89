@@ -20,7 +20,7 @@ module ID(
     output wire stallreq_for_fifo
 );
 
-// process input data
+// IF to FIFO
 
     reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;
     reg flag;
@@ -65,14 +65,14 @@ module ID(
     reg launch_r;
       
     wire ce, discard_current_inst;
-    wire [31:0] id_pc;
+    wire [31:0] id_pc, pc_idef;
     wire matched, inst1_matched, inst2_matched;
     reg [31:0] pc_to_match;
     reg match_pc_en;
 
-    assign {discard_current_inst, ce, id_pc} = if_to_id_bus_r;
+    assign {discard_current_inst, ce, pc_idef, id_pc} = if_to_id_bus_r;
     always @(posedge clk) begin
-        if (rst) begin
+        if (rst | flush) begin
             match_pc_en <= 1'b0;
             pc_to_match <= 32'b0;
         end
@@ -102,7 +102,7 @@ module ID(
     assign matched = inst1_matched | inst2_matched;
 
     assign inst1_in_val = ~ce                  ? 1'b0 :
-                          id_pc == 32'b0       ? 1'b0 :
+                          id_pc != pc_idef     ? 1'b0 :
                           discard_current_inst ? 1'b0 : 
                           ~inst1_matched       ? 1'b0 : 1'b1;
     assign inst2_in_val = ~ce                  ? 1'b0 :
@@ -116,7 +116,7 @@ module ID(
         .clk                  (clk               ),
         .rst                  (rst               ),
         .flush                (flush | br_bus[32]),
-        .stall                (stop_pop          ), 
+        .stall                ({stall[5:3],stop_pop,stall[1:0]}), 
         .issue_i              (launch_r          ),
         .issue_mode_i         (launch_mode       ),
         .ICache_inst1_i       (inst1_in          ),
@@ -349,6 +349,9 @@ module ID(
 
 // launch check
 
+    wire inst1_launch = inst1_valid & ~stallreq_for_cp0;
+    wire inst2_launch = (launch_mode == `DualIssue) & ~stallreq_for_cp0;
+
     assign sel_i1_src1 = inst1_info[15:13];
     assign sel_i2_src1 = inst2_info[15:13];
     assign sel_i1_src2 = inst1_info[12:9];
@@ -368,10 +371,10 @@ module ID(
                          (data_corelate | inst_conflict) ? `SingleIssue : 
                          inst2_is_br  ? `SingleIssue : 
                          ~inst2_valid ? `SingleIssue : `DualIssue;     
-    assign launched = inst1_valid | inst2_valid; // 这里要再考虑
+    assign launched = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
 
     always@(*)begin
-        if(rst|flush) begin
+        if(rst | flush) begin
             launch_r <= 1'b0;
         end
         else begin
@@ -379,14 +382,12 @@ module ID(
         end
     end
 
-    assign stop_pop = stall[2] | inst1_info[28] | inst1_info[29];// stall或发射除法后不再弹出
+    assign stop_pop = (stall[2]) | inst1_info[28] | inst1_info[29];// stall或发射除法后不再弹出
 
 
 // output part
 
     wire [`INST_BUS_WD-1:0] inst1_bus, inst2_bus;
-    wire inst1_launch = inst1_valid;
-    wire inst2_launch = (launch_mode == `DualIssue);
     wire switch;
     
     assign br_bus = br_bus1[32] & inst1_launch ? br_bus1[32:0] : 33'b0 ;

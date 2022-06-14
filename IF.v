@@ -16,7 +16,7 @@ module IF(
     output wire [31:0] inst_sram_addr,
     output wire [31:0] inst_sram_wdata
 );
-    reg [31:0] pc_reg;
+    reg [31:0] pc_reg, pc_idef;
     reg ce_reg;// 是否取址
     reg discard_following_inst;// 如果当前需要跳转则让FIFO忽略其要接收的两条指令
     
@@ -32,9 +32,11 @@ module IF(
     always @ (posedge clk) begin
         if (rst) begin
             pc_reg <= 32'hbfbf_fff8;
+            pc_idef <= 32'hbfbf_fff8;
         end
         else if (stall[0]==`NoStop) begin
             pc_reg <= {next_pc[31:3],3'b0};
+            pc_idef <= next_pc;
         end
     end
 
@@ -74,6 +76,7 @@ module IF(
     assign if_to_id_bus = {
         discard_following_inst,
         ce_reg,
+        pc_idef,
         pc_reg
     };
 

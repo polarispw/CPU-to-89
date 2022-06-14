@@ -3,7 +3,7 @@ module Instbuffer(
     input clk,
     input rst,
     input flush,
-    input stall,
+    input [`StallBus-1:0] stall,
 
     //launch
     input  wire issue_mode_i,                     //issue mode of issue stage
@@ -38,7 +38,7 @@ module Instbuffer(
     reg [`InstBufferSizeLog2-1:0]tail; //当前正在写入的数据位置
     reg [`InstBufferSizeLog2-1:0]head; //当前读取指令的首位置
     reg [`InstBufferSize-1:0]FIFO_valid; //buffer中每个位置的数据是否有效（高电平有效）
-    reg stall_r;
+    reg [`StallBus-1:0] stall_r;
 
     // pop after launching
     always@(posedge clk)begin
@@ -87,14 +87,14 @@ module Instbuffer(
     end	
 	   
 //output	
-	assign issue_inst1_o       = stall_r ? 32'b0 : FIFO_data[head]; 
-	assign issue_inst2_o       = stall_r ? 32'b0 : FIFO_data[head+`InstBufferSizeLog2'h1];
+	assign issue_inst1_o       = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_data[head]; 
+	assign issue_inst2_o       = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_data[head+`InstBufferSizeLog2'h1];
 	
-	assign issue_inst1_addr_o  = stall_r ? 32'b0 : FIFO_addr[head];
-	assign issue_inst2_addr_o  = stall_r ? 32'b0 : FIFO_addr[head+`InstBufferSizeLog2'h1];
+	assign issue_inst1_addr_o  = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_addr[head];
+	assign issue_inst2_addr_o  = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_addr[head+`InstBufferSizeLog2'h1];
 
-    assign issue_inst1_valid_o = stall_r ? 1'b0 : FIFO_valid[head];
-    assign issue_inst2_valid_o = stall_r ? 1'b0 : FIFO_valid[head+`InstBufferSizeLog2'h1];
+    assign issue_inst1_valid_o = stall_r[2] ? 1'b0 : FIFO_valid[head];
+    assign issue_inst2_valid_o = stall_r[2] ? 1'b0 : FIFO_valid[head+`InstBufferSizeLog2'h1];
 
 	assign buffer_full_o       = FIFO_valid[tail+`InstBufferSizeLog2'h5];
 

@@ -20,7 +20,7 @@ module CTRL(
             stall = `StallBus'b111_101;
         end
         else if (stallreq_for_bru | stallreq_for_cp0) begin
-            stall = `StallBus'b001_111;
+            stall = `StallBus'b001_101;
         end
         else if (stallreq_for_load) begin
             stall = `StallBus'b000_101;
