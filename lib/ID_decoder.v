@@ -377,10 +377,11 @@ module decoder(
         sel_rf_res      // 0
     };
 
-    assign inst_flag[0] = inst_div | inst_divu | inst_mult | inst_multu|
+    assign inst_flag[0] = inst_div | inst_divu | inst_mult | inst_multu |
                           inst_mfhi| inst_mflo | inst_mthi | inst_mtlo;
-    assign inst_flag[1] = inst_lb  | inst_lbu  | inst_lh   | inst_lhu|
+    assign inst_flag[1] = inst_lb  | inst_lbu  | inst_lh   | inst_lhu |
                           inst_lw  | inst_sb   | inst_sh   | inst_sw;
-    assign inst_flag[2] = inst_mfc0| inst_mtc0 | inst_syscall | inst_break | inst_eret;
+    assign inst_flag[2] = inst_mfc0| inst_mtc0 | inst_syscall | inst_break | inst_eret |
+                          inst_add | inst_addi | inst_sub;
 
 endmodule

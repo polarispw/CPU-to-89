@@ -111,7 +111,7 @@ module MEM(
     assign CP0_to_ctrl_bus = {to_be_flushed, new_pc};
 
     assign rf_wdata = sel_rf_res & data_ram_en ? mem_result : 
-                      excepttype_i[1] ? cp0_rdata : ex_result;
+                      excepttype_i[1]          ? cp0_rdata  : ex_result;
 
 // output
     wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
