@@ -123,6 +123,8 @@ module MEM(
     wire [31:0] cp0_rdata;
     wire [31:0] new_pc;
     wire to_be_flushed;
+    wire caused_by_i1, caused_by_i2;
+
     CP0 u_CP0(
         .rst            (rst             ),
         .clk            (clk             ),
@@ -137,7 +139,9 @@ module MEM(
         
         .o_rdata        (cp0_rdata       ),
         .new_pc         (new_pc          ),
-        .to_be_flushed  (to_be_flushed   )
+        .to_be_flushed  (to_be_flushed   ),
+        .caused_by_i1   (caused_by_i1    ),
+        .caused_by_i2   (caused_by_i2    )
     );
     assign CP0_to_ctrl_bus = {to_be_flushed, new_pc};
 

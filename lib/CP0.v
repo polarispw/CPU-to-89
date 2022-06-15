@@ -13,7 +13,9 @@ module CP0(
 
     output wire [31:0] o_rdata,
     output wire [31:0] new_pc,
-    output wire to_be_flushed
+    output wire to_be_flushed,
+    output wire caused_by_i1, 
+    output wire caused_by_i2
 );
 
     reg [31:0] badvaddr;
@@ -28,7 +30,7 @@ module CP0(
     wire [31:0] current_pc;
     wire [31:0] rt_rdata;
     wire [31:0] bad_addr;
-    wire caused_by_i1, caused_by_i2;
+   
     wire is_in_delayslot;
     wire except_of_pc_addr;
     wire adel;
@@ -44,6 +46,10 @@ module CP0(
     wire [7:0] interrupt;
     reg [31:0] cp0_rdata;
     reg interrupt_happen;
+
+    wire except_happen = except_of_overflow | except_of_syscall | except_of_break |
+                         except_of_pc_addr  | adel | ades | except_of_invalid_inst|
+                         interrupt_happen;
 
     assign excepttype = excepttype_i1 | excepttype_i2;
     assign caused_by_i1 = excepttype==excepttype_i1 ? 1'b1 : 1'b0;
@@ -73,9 +79,7 @@ module CP0(
 
     assign interrupt = cause[15:8]&status[15:8];
 
-    wire except_happen = except_of_overflow | except_of_syscall | except_of_break |
-                         except_of_pc_addr  | adel | ades | except_of_invalid_inst|
-                         interrupt_happen;
+
 
     reg tick;
     

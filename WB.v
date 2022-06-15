@@ -32,9 +32,6 @@ module WB(
         if (rst) begin
             mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
         end
-        // else if (flush) begin
-        //     mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
-        // end
         else if (stall[5]==`Stop) begin
             mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
         end
