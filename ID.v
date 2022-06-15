@@ -137,7 +137,9 @@ module ID(
     );
 
     reg [31:0] inst1_pc_r, inst2_pc_r;
-    reg last_inst_is_br;
+    reg last_inst_is_br, pre_is_br;//后者控制单发射时的延迟槽
+    wire [32:0] br_bus1, br_bus2;
+
     always @(posedge clk) begin
         if(rst | flush | ~br_bus[32]) begin
             last_inst_is_br <= 1'b0;
@@ -148,6 +150,13 @@ module ID(
             last_inst_is_br <= 1'b1;
             inst1_pc_r <= inst1_pc_o;
             inst2_pc_r <= inst2_pc_o;
+        end
+
+        if(rst | flush | br_bus1[31:0]==32'b0) begin
+            pre_is_br <= 1'b0;
+        end
+        else if(br_bus1[31:0]!=32'b0 & launch_mode==`SingleIssue) begin
+            pre_is_br <= 1'b1;
         end
     end
 
@@ -229,8 +238,8 @@ module ID(
 
 // decode instructions
 
-    wire [59:0] inst1_info, inst2_info;
-    wire [32:0] br_bus1, br_bus2;
+    wire [59:0] inst1_info_o, inst1_info, inst2_info_o, inst2_info;
+    
     wire [2:0] inst_flag1, inst_flag2;
     wire [4:0] rs_i1, rs_i2, rt_i1, rt_i2;
     wire stallreq_for_cp0_i1, stallreq_for_cp0_i2;
@@ -256,6 +265,8 @@ module ID(
     wire [31:0] hi_rdata, lo_rdata;
     // both hi/lo reg are unique, there is no need to declare twice(i1,i2)
 
+    wire inst1_special, inst2_special, delayslot_special;
+
     decoder u1_decoder(
         .inst_sram_rdata  (inst1               ),
         .rdata1           (rdata1_i1           ),  
@@ -265,8 +276,9 @@ module ID(
         .ex_rf_we         (ex_rf_we            ),
         .last_inst_is_mfc0(last_inst_is_mfc0   ),
         .ex_rf_waddr      (ex_rf_waddr         ),
-        .inst_info        (inst1_info          ),
+        .inst_info        (inst1_info_o        ),
         .br_bus           (br_bus1             ),
+        .delayslot_special(inst1_special       ),
         .stallreq_for_load(stallreq_for_load_i1),
         .stallreq_for_cp0 (stallreq_for_cp0_i1 ),
         .inst_flag        (inst_flag1          )
@@ -281,9 +293,10 @@ module ID(
         .ex_rf_we         (ex_rf_we            ),
         .last_inst_is_mfc0(last_inst_is_mfc0   ),
         .ex_rf_waddr      (ex_rf_waddr         ),
-        .inst_info        (inst2_info          ),
+        .inst_info        (inst2_info_o        ),
         .br_bus           (br_bus2             ),
         .next_is_delayslot(inst2_is_br         ),
+        .delayslot_special(inst2_special       ),
         .stallreq_for_load(stallreq_for_load_i2),
         .stallreq_for_cp0 (stallreq_for_cp0_i2 ),
         .inst_flag        (inst_flag2          )
@@ -291,7 +304,11 @@ module ID(
 
     assign stallreq_for_load = stallreq_for_load_i1;
     assign stallreq_for_cp0 = stallreq_for_cp0_i1 | stallreq_for_cp0_i2;
-    
+    assign delayslot_special = (br_bus[32] & inst2_special) | (pre_is_br & inst1_special);
+    assign inst1_info = (pre_is_br & inst1_special)  ? {inst1_info_o[59:55], delayslot_special, inst1_info_o[53:0]} :
+                                                       inst1_info_o;
+    assign inst2_info = (br_bus[32] & inst2_special) ? {inst2_info_o[59:55], delayslot_special, inst2_info_o[53:0]} :
+                                                       inst2_info_o;
 
 // operate regfile
     // RW
@@ -392,12 +409,12 @@ module ID(
                            (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
 
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) || (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
-    assign launch_mode = br_bus1[32]  ? `DualIssue :
+    assign launch_mode = br_bus1[32]                     ? `DualIssue   :
                          (data_corelate | inst_conflict) ? `SingleIssue : 
-                         inst2_is_br  ? `SingleIssue : 
-                         inst2_info[53] ? `SingleIssue :
-                         inst2_info[47] ? `SingleIssue :
-                         ~inst2_valid ? `SingleIssue : `DualIssue;     
+                         inst2_is_br                     ? `SingleIssue : 
+                         inst2_info[53]                  ? `SingleIssue :
+                         inst2_info[47]                  ? `SingleIssue :
+                         ~inst2_valid                    ? `SingleIssue : `DualIssue;     
     assign launched = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
 
     always@(*)begin

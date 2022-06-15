@@ -13,6 +13,7 @@ module decoder(
 
     output wire [32:0] br_bus,
     output wire next_is_delayslot,
+    output wire delayslot_special,
     output wire stallreq_for_load,
     output wire stallreq_for_cp0,
     output wire [2:0] inst_flag
@@ -383,5 +384,6 @@ module decoder(
                           inst_lw  | inst_sb   | inst_sh   | inst_sw;
     assign inst_flag[2] = inst_mfc0| inst_mtc0 | inst_syscall | inst_break | inst_eret |
                           inst_add | inst_addi | inst_sub;
+    assign delayslot_special = inst_syscall | inst_break | inst_eret | inst_add | inst_addi | inst_sub;
 
 endmodule

@@ -126,10 +126,15 @@ module MEM(
     CP0 u_CP0(
         .rst            (rst             ),
         .clk            (clk             ),
-        .excepttype     (excepttype_i_i1 ),
-        .bad_addr       (ex_result_i1    ),
-        .rt_rdata       (ex_result_i1    ),
-        .current_pc     (mem_pc_i1       ),
+        .excepttype_i1  (excepttype_i_i1 ),
+        .excepttype_i2  (excepttype_i_i2 ),
+        .current_pc_i1  (mem_pc_i1       ),
+        .current_pc_i2  (mem_pc_i2       ),
+        .rt_rdata_i1    (ex_result_i1    ),
+        .rt_rdata_i2    (ex_result_i2    ),
+        .bad_addr_i1    (ex_result_i1    ),
+        .bad_addr_i2    (ex_result_i2    ),
+        
         .o_rdata        (cp0_rdata       ),
         .new_pc         (new_pc          ),
         .to_be_flushed  (to_be_flushed   )
@@ -139,7 +144,6 @@ module MEM(
 
 // output
     wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
-    wire switch;
 
     assign rf_wdata_i1 = sel_rf_res_i1 & data_ram_en_i1 ? mem_result_i1 : 
                          excepttype_i_i1[1]             ? cp0_rdata     : ex_result_i1;
@@ -162,7 +166,6 @@ module MEM(
         rf_wdata_i2
     } : 136'b0;
 
-    assign switch = ex_to_mem_bus_r[334];
     assign mem_to_wb_bus = to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
                                            {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
 

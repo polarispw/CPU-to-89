@@ -2,10 +2,14 @@
 module CP0(
     input wire rst,
     input wire clk,
-    input wire [`EXCEPTTYPE_WD-1:0] excepttype,
-    input wire [31:0] current_pc,
-    input wire [31:0] rt_rdata,
-    input wire [31:0] bad_addr,
+    input wire [`EXCEPTTYPE_WD-1:0] excepttype_i1,
+    input wire [`EXCEPTTYPE_WD-1:0] excepttype_i2,
+    input wire [31:0] current_pc_i1,
+    input wire [31:0] current_pc_i2,
+    input wire [31:0] rt_rdata_i1,
+    input wire [31:0] rt_rdata_i2,
+    input wire [31:0] bad_addr_i1,
+    input wire [31:0] bad_addr_i2,
 
     output wire [31:0] o_rdata,
     output wire [31:0] new_pc,
@@ -20,6 +24,11 @@ module CP0(
     reg [31:0] compare;//$11
     reg [31:0] r_10010;//$18
 
+    wire [`EXCEPTTYPE_WD-1:0] excepttype;
+    wire [31:0] current_pc;
+    wire [31:0] rt_rdata;
+    wire [31:0] bad_addr;
+    wire caused_by_i1, caused_by_i2;
     wire is_in_delayslot;
     wire except_of_pc_addr;
     wire adel;
@@ -36,19 +45,30 @@ module CP0(
     reg [31:0] cp0_rdata;
     reg interrupt_happen;
 
+    assign excepttype = excepttype_i1 | excepttype_i2;
+    assign caused_by_i1 = excepttype==excepttype_i1 ? 1'b1 : 1'b0;
+    assign caused_by_i2 = excepttype==excepttype_i2 ? 1'b1 : 1'b0;
+
+    assign current_pc = caused_by_i1 ? current_pc_i1 :
+                        caused_by_i2 ? current_pc_i2 : 32'b0;
+    assign rt_rdata = caused_by_i1 ? rt_rdata_i1 :
+                      caused_by_i2 ? rt_rdata_i2 : 32'b0;
+    assign bad_addr = caused_by_i1 ? bad_addr_i1 :
+                      caused_by_i2 ? bad_addr_i2 : 32'b0;
+
     assign {
-        target_addr, //15:11
-        is_in_delayslot, //10
-        except_of_pc_addr, //9
-        ades, //8
-        adel, //7
-        except_of_overflow, //6
-        except_of_syscall, //5
-        except_of_break, //4
+        target_addr,            //15:11
+        is_in_delayslot,        //10
+        except_of_pc_addr,      //9
+        ades,                   //8
+        adel,                   //7
+        except_of_overflow,     //6
+        except_of_syscall,      //5
+        except_of_break,        //4
         except_of_invalid_inst, //3
-        inst_eret, //2
-        inst_mfc0, //1
-        inst_mtc0//0
+        inst_eret,              //2
+        inst_mfc0,              //1
+        inst_mtc0               //0
     } = excepttype;
 
     assign interrupt = cause[15:8]&status[15:8];
