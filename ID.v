@@ -112,7 +112,7 @@ module ID(
                           ~matched             ? 1'b0 : 1'b1;
 
     assign stallreq_for_fifo = fifo_full & ~br_bus[32];// 队满时要发射的如果恰好是跳转则不能stall 要让IF取址(队列已留出冗余,不会真的爆)
-
+    
     Instbuffer FIFO_buffer(
         .clk                  (clk               ),
         .rst                  (rst               ),
@@ -233,6 +233,8 @@ module ID(
     wire [32:0] br_bus1, br_bus2;
     wire [2:0] inst_flag1, inst_flag2;
     wire [4:0] rs_i1, rs_i2, rt_i1, rt_i2;
+    wire stallreq_for_cp0_i1, stallreq_for_cp0_i2;
+    wire stallreq_for_load_i1, stallreq_for_load_i2;
 
     assign rs_i1 = inst1[25:21];
     assign rt_i1 = inst1[20:16];
@@ -255,38 +257,41 @@ module ID(
     // both hi/lo reg are unique, there is no need to declare twice(i1,i2)
 
     decoder u1_decoder(
-        .inst_sram_rdata  (inst1            ),
-        .rdata1           (rdata1_i1        ),  
-        .rdata2           (rdata2_i1        ), 
-        .id_pc            (inst1_pc         ),
-        .ce               (ce               ),
-        .ex_rf_we         (ex_rf_we         ),
-        .last_inst_is_mfc0(last_inst_is_mfc0),
-        .ex_rf_waddr      (ex_rf_waddr      ),
-        .inst_info        (inst1_info       ),
-        .br_bus           (br_bus1          ),
-        .stallreq_for_load(stallreq_for_load),
-        .stallreq_for_cp0 (stallreq_for_cp0 ),
-        .inst_flag        (inst_flag1       )
+        .inst_sram_rdata  (inst1               ),
+        .rdata1           (rdata1_i1           ),  
+        .rdata2           (rdata2_i1           ), 
+        .id_pc            (inst1_pc            ),
+        .ce               (ce                  ),
+        .ex_rf_we         (ex_rf_we            ),
+        .last_inst_is_mfc0(last_inst_is_mfc0   ),
+        .ex_rf_waddr      (ex_rf_waddr         ),
+        .inst_info        (inst1_info          ),
+        .br_bus           (br_bus1             ),
+        .stallreq_for_load(stallreq_for_load_i1),
+        .stallreq_for_cp0 (stallreq_for_cp0_i1 ),
+        .inst_flag        (inst_flag1          )
     );
 
     decoder u2_decoder(
-        .inst_sram_rdata  (inst2            ),
-        .rdata1           (rdata1_i2        ),  
-        .rdata2           (rdata2_i2        ),
-        .id_pc            (inst2_pc         ),
-        .ce               (ce               ),
-        .ex_rf_we         (ex_rf_we         ),
-        .last_inst_is_mfc0(last_inst_is_mfc0),
-        .ex_rf_waddr      (ex_rf_waddr      ),
-        .inst_info        (inst2_info       ),
-        .br_bus           (br_bus2          ),
-        .next_is_delayslot(inst2_is_br      ),
-        // .stallreq_for_load(stallreq_for_load),
-        // .stallreq_for_cp0 (stallreq_for_cp0 ),
-        .inst_flag        (inst_flag2       )
+        .inst_sram_rdata  (inst2               ),
+        .rdata1           (rdata1_i2           ),  
+        .rdata2           (rdata2_i2           ),
+        .id_pc            (inst2_pc            ),
+        .ce               (ce                  ),
+        .ex_rf_we         (ex_rf_we            ),
+        .last_inst_is_mfc0(last_inst_is_mfc0   ),
+        .ex_rf_waddr      (ex_rf_waddr         ),
+        .inst_info        (inst2_info          ),
+        .br_bus           (br_bus2             ),
+        .next_is_delayslot(inst2_is_br         ),
+        .stallreq_for_load(stallreq_for_load_i2),
+        .stallreq_for_cp0 (stallreq_for_cp0_i2 ),
+        .inst_flag        (inst_flag2          )
     );
 
+    assign stallreq_for_load = stallreq_for_load_i1;
+    assign stallreq_for_cp0 = stallreq_for_cp0_i1 | stallreq_for_cp0_i2;
+    
 
 // operate regfile
     // RW
