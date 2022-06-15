@@ -305,10 +305,9 @@ module ID(
     assign stallreq_for_load = stallreq_for_load_i1;
     assign stallreq_for_cp0 = stallreq_for_cp0_i1 | stallreq_for_cp0_i2;
     assign delayslot_special = (br_bus[32] & inst2_special) | (pre_is_br & inst1_special);
-    assign inst1_info = (pre_is_br & inst1_special)  ? {inst1_info_o[59:55], delayslot_special, inst1_info_o[53:0]} :
-                                                       inst1_info_o;
-    assign inst2_info = (br_bus[32] & inst2_special) ? {inst2_info_o[59:55], delayslot_special, inst2_info_o[53:0]} :
-                                                       inst2_info_o;
+    
+    assign inst1_info = pre_is_br   ? {inst1_info_o[59:55], 1'b1, inst1_info_o[53:0]} : inst1_info_o;
+    assign inst2_info = br_bus1[32] ? {inst2_info_o[59:55], 1'b1, inst2_info_o[53:0]} : inst2_info_o;
 
 // operate regfile
     // RW
