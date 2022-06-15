@@ -24,7 +24,7 @@ module mycpu_core(
     // forward
     wire [`IF_TO_ID_WD-1   :0] if_to_id_bus;
     wire [`ID_TO_EX_WD-1   :0] id_to_ex_bus;
-    wire [`EX_TO_MEM_WD*2  :0] ex_to_mem_bus;
+    wire [`EX_TO_MEM_WD*2+2:0] ex_to_mem_bus;
     wire [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus;
     // backward
     wire [`BR_WD-1         :0] br_bus; 

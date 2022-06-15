@@ -54,6 +54,7 @@ module ID(
 
     wire [31:0] inst1, inst2;
     wire [31:0] inst1_pc, inst2_pc;
+    wire [31:0] inst1_pc_o, inst2_pc_o;
     wire inst1_valid, inst2_valid;
     wire out_valid;
     wire fifo_full;
@@ -128,12 +129,30 @@ module ID(
         .only_delayslot_inst_i(1'b0              ),
         .issue_inst1_o        (inst1             ),
         .issue_inst2_o        (inst2             ),
-        .issue_inst1_addr_o   (inst1_pc          ),
-        .issue_inst2_addr_o   (inst2_pc          ),
+        .issue_inst1_addr_o   (inst1_pc_o        ),
+        .issue_inst2_addr_o   (inst2_pc_o        ),
         .issue_inst1_valid_o  (inst1_valid       ),
         .issue_inst2_valid_o  (inst2_valid       ),         
         .buffer_full_o        (fifo_full         )
     );
+
+    reg [31:0] inst1_pc_r, inst2_pc_r;
+    reg last_inst_is_br;
+    always @(posedge clk) begin
+        if(rst | flush | ~br_bus[32]) begin
+            last_inst_is_br <= 1'b0;
+            inst1_pc_r <= 32'b0;
+            inst2_pc_r <= 32'b0;
+        end
+        else if(br_bus[32]) begin
+            last_inst_is_br <= 1'b1;
+            inst1_pc_r <= inst1_pc_o;
+            inst2_pc_r <= inst2_pc_o;
+        end
+    end
+
+    assign inst1_pc = last_inst_is_br ? inst1_pc_r : inst1_pc_o;
+    assign inst2_pc = last_inst_is_br ? inst2_pc_r : inst2_pc_o;
 
 
 // bypass and WB signal declare/init 
@@ -351,7 +370,7 @@ module ID(
 // launch check
 
     wire inst1_launch = inst1_valid & ~stallreq_for_cp0;
-    wire inst2_launch = (launch_mode == `DualIssue) & ~stallreq_for_cp0;
+    wire inst2_launch = inst2_valid & (launch_mode == `DualIssue) & ~stallreq_for_cp0;
 
     assign sel_i1_src1 = inst1_info[15:13];
     assign sel_i2_src1 = inst2_info[15:13];
@@ -396,7 +415,8 @@ module ID(
     assign br_bus = br_bus1[32] & inst1_launch ? br_bus1[32:0] : 33'b0 ;
     assign switch = br_bus[32];
 
-    assign inst1_bus = {
+    assign inst1_bus = inst1_launch ?
+    {
         inst1_info[58:28],// 250:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
@@ -405,8 +425,8 @@ module ID(
         inst1_info[27:0], // 91:64
         rdata2_i1,        // 63:32
         rdata1_i1         // 31:0
-    };
-    assign inst2_bus = inst2_valid ?
+    } : {95'b0,inst1_pc_r,124'b0};
+    assign inst2_bus = inst2_launch ?
     {
         inst2_info[58:28],// 250:220
         hi_rdata,         // 219:188
@@ -416,7 +436,7 @@ module ID(
         inst2_info[27:0], // 91:64
         rdata2_i2,        // 63:32
         rdata1_i2         // 31:0
-    } : 251'b0;
+    } : {95'b0,inst2_pc_r,124'b0};
         // excepttype,     // 250:236
         // mem_op,         // 235:228
         // hilo_op,        // 227:220

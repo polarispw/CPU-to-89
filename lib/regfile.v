@@ -24,6 +24,7 @@ module regfile(
 
     // write
     always @ (posedge clk) begin
+        reg_array[0] <= 32'b0;
         if (we_i1 && waddr_i1!=5'b0) begin
             reg_array[waddr_i1] <= wdata_i1;
         end

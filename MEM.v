@@ -5,7 +5,7 @@ module MEM(
     input wire flush,
     input wire [`StallBus-1:0] stall,
 
-    input wire [`EX_TO_MEM_WD*2:0] ex_to_mem_bus,
+    input wire [`EX_TO_MEM_WD*2+2:0] ex_to_mem_bus,
     input wire [31:0] data_sram_rdata,
 
     output wire [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus,
@@ -13,7 +13,7 @@ module MEM(
     output wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus
 );
 
-    reg [`EX_TO_MEM_WD*2:0] ex_to_mem_bus_r;
+    reg [`EX_TO_MEM_WD*2+2:0] ex_to_mem_bus_r;
 
     always @ (posedge clk) begin
         if (rst | flush) begin
@@ -40,8 +40,11 @@ module MEM(
     wire [`HILO_WD-1:0] hilo_bus_i1, hilo_bus_i2;
     wire [7:0] mem_op_i1, mem_op_i2;
     wire [`EXCEPTTYPE_WD-1:0] excepttype_i_i1, excepttype_i_i2;
+    wire inst1_valid, inst2_valid;
 
     assign {
+        inst2_valid,
+        inst1_valid,
         excepttype_i_i2,   // 333:318
         mem_op_i2,         // 317:310
         hilo_bus_i2,       // 309:244
@@ -64,7 +67,7 @@ module MEM(
         rf_we_i1,          // 37
         rf_waddr_i1,       // 36:32
         ex_result_i1       // 31:0
-    } =  ex_to_mem_bus_r[333:0];
+    } =  ex_to_mem_bus_r[335:0];
 
 
 // load data
@@ -142,20 +145,22 @@ module MEM(
                          excepttype_i_i1[1]             ? cp0_rdata     : ex_result_i1;
     assign rf_wdata_i2 = sel_rf_res_i2 & data_ram_en_i2 ? mem_result_i2 : ex_result_i2;
 
-    assign mem_to_wb_bus_i1 = {
+    assign mem_to_wb_bus_i1 = inst1_valid ?
+    {
         hilo_bus_i1,   // 135:70
         mem_pc_i1,     // 69:38
         rf_we_i1,      // 37
         rf_waddr_i1,   // 36:32
         rf_wdata_i1    // 31:0
-    };
-    assign mem_to_wb_bus_i2 = {
+    } : 136'b0;
+    assign mem_to_wb_bus_i2 = inst2_valid ?
+    {
         hilo_bus_i2,
         mem_pc_i2,
         rf_we_i2,
         rf_waddr_i2,
         rf_wdata_i2
-    };
+    } : 136'b0;
 
     assign switch = ex_to_mem_bus_r[334];
     assign mem_to_wb_bus = to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
