@@ -170,7 +170,7 @@ module MEM(
         rf_wdata_i2
     } : 136'b0;
 
-    assign mem_to_wb_bus =  caused_by_i2  ? {`MEM_TO_WB_WD'b0, mem_to_wb_bus_i1} :
+    assign mem_to_wb_bus =  caused_by_i2  ? {`MEM_TO_WB_WD'b0, mem_to_wb_bus_i1} ://解决有写回要求的跳转指令延迟槽造成例外时flush导致跳转指令写回失败
                             to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
                                            {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
 
