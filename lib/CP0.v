@@ -52,8 +52,8 @@ module CP0(
                          interrupt_happen;
 
     assign excepttype = excepttype_i1 | excepttype_i2;
-    assign caused_by_i1 = excepttype==excepttype_i1 ? 1'b1 : 1'b0;
-    assign caused_by_i2 = excepttype==excepttype_i2 ? 1'b1 : 1'b0;
+    assign caused_by_i1 = excepttype==excepttype_i1 ? 1'b1 : 1'b0;//结合to be flushed使用
+    assign caused_by_i2 = excepttype_i2[9:3] == 7'b0 ? 1'b0 : 1'b1;
 
     assign current_pc = caused_by_i1 ? current_pc_i1 :
                         caused_by_i2 ? current_pc_i2 : 32'b0;

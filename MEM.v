@@ -170,7 +170,8 @@ module MEM(
         rf_wdata_i2
     } : 136'b0;
 
-    assign mem_to_wb_bus = to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
+    assign mem_to_wb_bus =  caused_by_i2  ? {`MEM_TO_WB_WD'b0, mem_to_wb_bus_i1} :
+                            to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
                                            {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
 
     assign mem_to_rf_bus = {
