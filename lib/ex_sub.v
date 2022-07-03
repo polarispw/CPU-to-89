@@ -3,10 +3,10 @@ module sub_ex(
     input wire rst,
     input wire clk,
     input wire flush,
-    input wire [`INST_BUS_WD-1:0] inst_bus,
+    input wire [`ID_INST_INFO-1:0] inst_bus,
 
     output wire stallreq_for_ex,
-    output wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
+    output wire [`EX_INST_INFO-1:0] ex_to_mem_bus,
     output wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus,
 
     output wire data_sram_en,
@@ -30,15 +30,15 @@ module sub_ex(
     wire [31:0] hi_i, lo_i;
     wire [7:0] hilo_op;
     wire [7:0] mem_op;
-    wire [`EXCEPTTYPE_WD-1:0] excepttype_i;
-    wire [`EXCEPTTYPE_WD-1:0] excepttype_o;
+    wire [`EXCEPTINFO_WD-1:0] exceptinfo_i;
+    wire [`EXCEPTINFO_WD-1:0] exceptinfo_o;
     wire is_inst_mfc0;
     wire except_of_pc_addr;
     wire adel;
     wire ades;
 
     assign {
-        excepttype_i,   // 249:236
+        exceptinfo_i,   // 251:236
         mem_op,         // 235:228
         hilo_op,        // 227:220
         hi_i, lo_i,     // 219:156
@@ -67,7 +67,7 @@ module sub_ex(
 
     assign alu_src1 = sel_alu_src1[1] ? ex_pc :
                       sel_alu_src1[2] ? sa_zero_extend :
-                      excepttype_i[0] ? 32'b0 : rf_rdata1;
+                      exceptinfo_i[0] ? 32'b0 : rf_rdata1;
 
     assign alu_src2 = sel_alu_src2[1] ? imm_sign_extend :
                       sel_alu_src2[2] ? 32'd8 :
@@ -100,12 +100,11 @@ module sub_ex(
                           inst_sh | inst_lh | inst_lhu ? {{2{byte_sel[2]}},{2{byte_sel[0]}}} :
                           inst_sw | inst_lw ? 4'b1111 : 4'b0000;
 
-    assign data_sram_en     = flush | ades | except_of_pc_addr ? 1'b0 : data_ram_en;
-    assign data_sram_wen    = {4{data_ram_wen}}&data_ram_sel;
-    assign data_sram_addr   = ex_result;
-    assign data_sram_wdata  = inst_sb ? {4{rf_rdata2[7:0]}} :
-                              inst_sh ? {2{rf_rdata2[15:0]}} :
-                            /*inst_sw*/ rf_rdata2;
+    assign data_sram_en    = flush | ades | except_of_pc_addr ? 1'b0 : data_ram_en;
+    assign data_sram_wen   = {4{data_ram_wen}}&data_ram_sel;
+    assign data_sram_addr  = ex_result;
+    assign data_sram_wdata = inst_sb ? {4{rf_rdata2[7:0]}}  :
+                              inst_sh ? {2{rf_rdata2[15:0]}} : rf_rdata2;
 
 // mul & div
     wire inst_mfhi, inst_mflo,  inst_mthi,  inst_mtlo;
@@ -247,7 +246,7 @@ module sub_ex(
     wire int_overflow_pos;
     wire except_of_overflow;
     
-    assign is_inst_mfc0 = excepttype_i[1];
+    assign is_inst_mfc0 = exceptinfo_i[1];
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
                               (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0010) |  
                               (inst[31:26]==6'b00_1000) ? 1'b1:1'b0;
@@ -259,11 +258,11 @@ module sub_ex(
 
     assign except_of_overflow = ((int_overflow_pos==1'b1) && (ov_sum == 1'b1)) ? 1'b1 : 1'b0;
     
-    assign except_of_pc_addr = excepttype_i[9];
+    assign except_of_pc_addr = exceptinfo_i[9];
     assign adel = ((inst_lw && data_sram_addr[1:0] != 2'b0) || ((inst_lh||inst_lhu) && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
     assign ades = ((inst_sw && data_sram_addr[1:0] != 2'b0) || (inst_sh && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
 
-    assign excepttype_o = {excepttype_i[15:9], ades, adel, except_of_overflow, excepttype_i[5:0]};
+    assign exceptinfo_o = {exceptinfo_i[15:9], ades, adel, except_of_overflow, exceptinfo_i[5:0]};
 
 // output
 
@@ -272,7 +271,7 @@ module sub_ex(
                      : alu_result;
 
     assign ex_to_mem_bus = {
-        excepttype_o,   // 166:151    
+        exceptinfo_o,   // 166:151    
         mem_op,         // 150:143
         hilo_bus,       // 142:77
         ex_pc,          // 76:45

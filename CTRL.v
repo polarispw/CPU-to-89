@@ -10,26 +10,26 @@ module CTRL(
 
     output reg flush,
     output reg [31:0] new_pc,
-    output reg [`StallBus-1:0] stall
+    output reg [`STALLBUS_WD-1:0] stall
 );  
     always @ (*) begin
         if (rst | flush) begin
-            stall = `StallBus'b0;
+            stall = `STALLBUS_WD'b0;
         end
         else if (stallreq_for_ex) begin
-            stall = `StallBus'b111_101;
+            stall = `STALLBUS_WD'b111_101;
         end
         else if (stallreq_for_bru | stallreq_for_cp0) begin
-            stall = `StallBus'b001_101;
+            stall = `STALLBUS_WD'b001_101;
         end
         else if (stallreq_for_load) begin
-            stall = `StallBus'b000_101;
+            stall = `STALLBUS_WD'b000_101;
         end
         else if (stallreq_for_fifo) begin
-            stall = `StallBus'b000_001;
+            stall = `STALLBUS_WD'b000_001;
         end
         else begin
-            stall = `StallBus'b0;
+            stall = `STALLBUS_WD'b0;
         end
     end
 

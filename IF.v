@@ -2,7 +2,7 @@
 module IF(
     input wire clk,
     input wire rst,
-    input wire [`StallBus-1:0] stall,
+    input wire [`STALLBUS_WD-1:0] stall,
 
     input wire flush,
     input wire [31:0] new_pc,
@@ -16,6 +16,7 @@ module IF(
     output wire [31:0] inst_sram_addr,
     output wire [31:0] inst_sram_wdata
 );
+
     reg [31:0] pc_reg, pc_idef;
     reg ce_reg;// 是否取址
     reg discard_following_inst;// 如果当前需要跳转则让FIFO忽略其要接收的两条指令
@@ -31,7 +32,7 @@ module IF(
 
     always @ (posedge clk) begin
         if (rst) begin
-            pc_reg <= 32'hbfbf_fff8;
+            pc_reg  <= 32'hbfbf_fff8;
             pc_idef <= 32'hbfbf_fff8;
         end
         else if (stall[0]==`NoStop) begin
@@ -68,16 +69,16 @@ module IF(
                      br_e ? br_addr : 
                      pc_reg + 32'd8;
 
-    assign inst_sram_en = ce_reg;
-    assign inst_sram_wen = 4'b0;
-    assign inst_sram_addr = pc_reg;
-    assign inst_sram_wdata = 32'b0;
-
     assign if_to_id_bus = {
         discard_following_inst,
         ce_reg,
         pc_idef,
         pc_reg
     };
+
+    assign inst_sram_en    = ce_reg;
+    assign inst_sram_wen   = 4'b0;
+    assign inst_sram_addr  = pc_reg;
+    assign inst_sram_wdata = 32'b0;
 
 endmodule

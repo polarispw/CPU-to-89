@@ -4,13 +4,11 @@ module decoder(
     input wire [31:0] rdata1,
     input wire [31:0] rdata2,
     input wire [31:0] id_pc,
-    input wire ce,
     input wire ex_rf_we,
     input wire last_inst_is_mfc0,
     input wire [4:0] ex_rf_waddr,
 
     output wire [59:0] inst_info,
-
     output wire [32:0] br_bus,
     output wire next_is_delayslot,
     output wire delayslot_special,
@@ -50,21 +48,21 @@ module decoder(
     wire [2:0] sel_rf_dst;
 
     wire inst_valid;
-    wire [`EXCEPTTYPE_WD-1:0] excepttype;
+    wire [`EXCEPTINFO_WD-1:0] exceptinfo;
 
 //decode part
-    assign opcode = inst[31:26];
-    assign rs = inst[25:21];
-    assign rt = inst[20:16];
-    assign rd = inst[15:11];
-    assign sa = inst[10:6];
-    assign func = inst[5:0];
-    assign imm = inst[15:0];
+    assign opcode      = inst[31:26];
+    assign rs          = inst[25:21];
+    assign rt          = inst[20:16];
+    assign rd          = inst[15:11];
+    assign sa          = inst[10:6];
+    assign func        = inst[5:0];
+    assign imm         = inst[15:0];
     assign instr_index = inst[25:0];
-    assign code = inst[25:6];
-    assign base = inst[25:21];
-    assign offset = inst[15:0];
-    assign sel = inst[2:0];
+    assign code        = inst[25:6];
+    assign base        = inst[25:21];
+    assign offset      = inst[15:0];
+    assign sel         = inst[2:0];
 
     wire inst_add,  inst_addi,  inst_addu,  inst_addiu;
     wire inst_sub,  inst_subu,  inst_slt,   inst_slti;
@@ -77,7 +75,7 @@ module decoder(
     wire inst_blez, inst_bltz,  inst_bgezal,inst_bltzal;
     wire inst_j,    inst_jal,   inst_jr,    inst_jalr;
     wire inst_mfhi, inst_mflo,  inst_mthi,  inst_mtlo;
-    wire inst_break,    inst_syscall;
+    wire inst_break,inst_syscall;
     wire inst_lb,   inst_lbu,   inst_lh,    inst_lhu,   inst_lw;
     wire inst_sb,   inst_sh,    inst_sw;
     wire inst_eret, inst_mfc0,  inst_mtc0;
@@ -85,7 +83,7 @@ module decoder(
     wire op_add, op_sub, op_slt, op_sltu;
     wire op_and, op_nor, op_or, op_xor;
     wire op_sll, op_srl, op_sra, op_lui;
-//decoder
+
     decoder_6_64 u0_decoder_6_64(
     	.in  (opcode    ),
         .out (op_d      )
@@ -140,7 +138,7 @@ module decoder(
     assign inst_xor     = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b10_0110];
     assign inst_xori    = op_d[6'b00_1110];
     assign inst_sllv    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0100];
-    assign inst_sll     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0000];// & !((ce == 1'b0) && (id_pc == 32'b0));
+    assign inst_sll     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0000];
     assign inst_srav    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0111];
     assign inst_sra     = op_d[6'b00_0000] & rs_d[5'b0_0000] & func_d[6'b00_0011];
     assign inst_srlv    = op_d[6'b00_0000] & sa_d[5'b0_0000] & func_d[6'b00_0110];
@@ -206,23 +204,23 @@ module decoder(
 
 
     //op select
-    assign op_add = inst_add | inst_addi | inst_addiu | inst_addu | inst_jal | inst_sw | inst_lw | inst_bltzal | inst_bgezal
-                  | inst_jalr | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_mtc0;
-    assign op_sub = inst_subu | inst_sub;
-    assign op_slt = inst_slt | inst_slti;
+    assign op_add  = inst_add  | inst_addi | inst_addiu | inst_addu | inst_jal | inst_sw | inst_lw | inst_bltzal | inst_bgezal |
+                     inst_jalr | inst_lb   | inst_lbu   | inst_lh   | inst_lhu | inst_sb | inst_sh | inst_mtc0;
+    assign op_sub  = inst_subu | inst_sub;
+    assign op_slt  = inst_slt  | inst_slti;
     assign op_sltu = inst_sltu | inst_sltiu;
-    assign op_and = inst_and | inst_andi;
-    assign op_nor = inst_nor;
-    assign op_or = inst_ori | inst_or;
-    assign op_xor = inst_xor | inst_xori;
-    assign op_sll = inst_sll | inst_sllv;
-    assign op_srl = inst_srl | inst_srlv;
-    assign op_sra = inst_sra | inst_srav;
-    assign op_lui = inst_lui;
+    assign op_and  = inst_and  | inst_andi;
+    assign op_nor  = inst_nor;
+    assign op_or   = inst_ori  | inst_or;
+    assign op_xor  = inst_xor  | inst_xori;
+    assign op_sll  = inst_sll  | inst_sllv;
+    assign op_srl  = inst_srl  | inst_srlv;
+    assign op_sra  = inst_sra  | inst_srav;
+    assign op_lui  = inst_lui;
 
     assign alu_op = {
         op_add, op_sub, op_slt, op_sltu,
-        op_and, op_nor, op_or, op_xor,
+        op_and, op_nor, op_or,  op_xor,
         op_sll, op_srl, op_sra, op_lui
     };
 
@@ -314,15 +312,11 @@ module decoder(
                    : inst_jal   ? {id_pc[31:28],instr_index,2'b0} 
                    : inst_jalr  ? rdata1 : 32'b0;
 
-    reg is_in_delayslot;
     assign next_is_delayslot = inst_beq  | inst_bne  | inst_bgez   | inst_bgtz   |
                                inst_blez | inst_bltz | inst_bltzal | inst_bgezal |
                                inst_j    | inst_jr   | inst_jal    | inst_jalr   ? 1'b1 : 1'b0;
 
-    assign br_bus = {
-        br_e,
-        br_addr
-    };
+    assign br_bus = { br_e, br_addr};
     
 //except
     wire delay_slot;
@@ -350,22 +344,24 @@ module decoder(
                         inst_break|inst_syscall|
                         inst_eret |inst_mfc0|inst_mtc0;
 
-    assign stallreq_for_cp0 = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
-    assign delay_slot = 1'b0; //is_in_delayslot;
-    assign except_of_pc_addr = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
-    assign except_of_overflow = 1'b0;
-    assign except_of_syscall = inst_syscall;
-    assign except_of_break = inst_break;
+    assign stallreq_for_cp0       = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
+    assign delay_slot             = 1'b0;
+    assign except_of_pc_addr      = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
+    assign except_of_overflow     = 1'b0;
+    assign except_of_syscall      = inst_syscall;
+    assign except_of_break        = inst_break;
     assign except_of_invalid_inst = ~inst_valid;
 
-    assign excepttype = {inst[15:11]      , delay_slot,
-                         except_of_pc_addr, adel, ades, except_of_overflow, 
-                         inst_syscall     , inst_break, except_of_invalid_inst,
-                         inst_eret        , inst_mfc0 , inst_mtc0};
+    assign exceptinfo = {
+        inst[15:11],  delay_slot, except_of_pc_addr, 
+        adel,         ades,       except_of_overflow, 
+        inst_syscall, inst_break, except_of_invalid_inst,
+        inst_eret,    inst_mfc0,  inst_mtc0
+        };
     
 //output
     assign inst_info = {
-        excepttype,     // 59:44
+        exceptinfo,     // 59:44
         mem_op,         // 43:36
         hilo_op,        // 35:28
         alu_op,         // 27:16

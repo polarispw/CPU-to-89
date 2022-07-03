@@ -3,13 +3,13 @@ module MEM(
     input wire clk,
     input wire rst,
     input wire flush,
-    input wire [`StallBus-1:0] stall,
+    input wire [`STALLBUS_WD-1:0] stall,
 
-    input wire [`EX_TO_MEM_WD*2+2:0] ex_to_mem_bus,
+    input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
     input wire [31:0] data_sram_rdata,
 
-    output wire [`MEM_TO_WB_WD*2-1:0] mem_to_wb_bus,
-    output wire [`MEM_TO_RF_WD*2-1:0] mem_to_rf_bus,
+    output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus,
+    output wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
     output wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus
 );
 
@@ -39,13 +39,13 @@ module MEM(
     wire [31:0] mem_result_i1, mem_result_i2;
     wire [`HILO_WD-1:0] hilo_bus_i1, hilo_bus_i2;
     wire [7:0] mem_op_i1, mem_op_i2;
-    wire [`EXCEPTTYPE_WD-1:0] excepttype_i_i1, excepttype_i_i2;
+    wire [`EXCEPTINFO_WD -1:0] exceptinfo_i_i1, exceptinfo_i_i2;
     wire inst1_valid, inst2_valid;
 
     assign {
-        inst2_valid,
-        inst1_valid,
-        excepttype_i_i2,   // 333:318
+        inst2_valid,       // 335
+        inst1_valid,       // 334
+        exceptinfo_i_i2,   // 333:318
         mem_op_i2,         // 317:310
         hilo_bus_i2,       // 309:244
         mem_pc_i2,         // 243:212
@@ -56,7 +56,7 @@ module MEM(
         rf_we_i2,          // 204
         rf_waddr_i2,       // 203:199
         ex_result_i2,      // 198:167
-        excepttype_i_i1,   // 166:151
+        exceptinfo_i_i1,   // 166:151
         mem_op_i1,         // 150:143
         hilo_bus_i1,       // 142:77
         mem_pc_i1,         // 76:45
@@ -128,8 +128,8 @@ module MEM(
     CP0 u_CP0(
         .rst            (rst             ),
         .clk            (clk             ),
-        .excepttype_i1  (excepttype_i_i1 ),
-        .excepttype_i2  (excepttype_i_i2 ),
+        .exceptinfo_i1  (exceptinfo_i_i1 ),
+        .exceptinfo_i2  (exceptinfo_i_i2 ),
         .current_pc_i1  (mem_pc_i1       ),
         .current_pc_i2  (mem_pc_i2       ),
         .rt_rdata_i1    (ex_result_i1    ),
@@ -147,10 +147,10 @@ module MEM(
 
 
 // output
-    wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
+    wire [`MEM_INST_INFO-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
 
     assign rf_wdata_i1 = sel_rf_res_i1 & data_ram_en_i1 ? mem_result_i1 : 
-                         excepttype_i_i1[1]             ? cp0_rdata     : ex_result_i1;
+                         exceptinfo_i_i1[1]             ? cp0_rdata     : ex_result_i1;
     assign rf_wdata_i2 = sel_rf_res_i2 & data_ram_en_i2 ? mem_result_i2 : ex_result_i2;
 
     assign mem_to_wb_bus_i1 = inst1_valid ?
@@ -161,6 +161,7 @@ module MEM(
         rf_waddr_i1,   // 36:32
         rf_wdata_i1    // 31:0
     } : 136'b0;
+
     assign mem_to_wb_bus_i2 = inst2_valid ?
     {
         hilo_bus_i2,
@@ -170,9 +171,9 @@ module MEM(
         rf_wdata_i2
     } : 136'b0;
 
-    assign mem_to_wb_bus =  caused_by_i2  ? {`MEM_TO_WB_WD'b0, mem_to_wb_bus_i1} ://解决有写回要求的跳转指令延迟槽造成例外时flush导致跳转指令写回失败
-                            to_be_flushed ? {`MEM_TO_WB_WD'b0, `MEM_TO_WB_WD'b0} :
-                                           {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
+    assign mem_to_wb_bus =  caused_by_i2  ? {`MEM_INST_INFO'b0, mem_to_wb_bus_i1} ://解决有写回要求的跳转指令延迟槽造成例外时flush导致跳转指令写回失败
+                            to_be_flushed ? {`MEM_INST_INFO'b0, `MEM_INST_INFO'b0} :
+                                            {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
 
     assign mem_to_rf_bus = {
         hilo_bus_i2,

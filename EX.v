@@ -3,14 +3,14 @@ module EX(
     input wire clk,
     input wire rst,
     input wire flush,
-    input wire [`StallBus-1:0] stall,
+    input wire [`STALLBUS_WD-1:0] stall,
     output wire stallreq_for_ex,
 
     input wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
 
-    output wire [`EX_TO_MEM_WD*2+2:0] ex_to_mem_bus,
+    output wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
 
-    output wire [`EX_TO_RF_WD*2-1:0] ex_to_rf_bus,
+    output wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus,
 
     output wire data_sram_en,
     output wire [3:0] data_sram_wen,
@@ -35,13 +35,13 @@ module EX(
         end
     end
 
-    wire [`INST_BUS_WD-1:0] inst1_bus, inst2_bus;
+    wire [`ID_INST_INFO-1:0] inst1_bus, inst2_bus;
     wire inst1_valid, inst2_valid;
     wire switch;
 
     wire stallreq_for_ex_i1, stallreq_for_ex_i2;
-    wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus_i1, ex_to_mem_bus_i2;
-    wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus_i1, ex_to_rf_bus_i2;
+    wire [`EX_INST_INFO-1:0] ex_to_mem_bus_i1, ex_to_mem_bus_i2;
+    wire [`EX_INFO_BACK-1:0] ex_to_rf_bus_i1, ex_to_rf_bus_i2;
  
     wire data_sram_en_i1, data_sram_en_i2;
     wire [3:0] data_sram_wen_i1, data_sram_wen_i2;
@@ -49,9 +49,9 @@ module EX(
     wire [31:0] data_sram_wdata_i1, data_sram_wdata_i2;
 
     assign {inst2_valid, inst1_valid} = id_to_ex_bus_r[1:0];
-    assign inst1_bus = id_to_ex_bus_r[252:2]  ;
-    assign inst2_bus = id_to_ex_bus_r[503:253];
-    assign switch = id_to_ex_bus_r[504];
+    assign inst1_bus = id_to_ex_bus_r[253:2]  ;
+    assign inst2_bus = id_to_ex_bus_r[505:254];
+    assign switch = id_to_ex_bus_r[506];
 
     sub_ex u1_sub_ex(
         .rst            (rst               ),
