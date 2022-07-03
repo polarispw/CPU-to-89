@@ -1,8 +1,18 @@
 # 双发射五级流水CPU
 
-## 改双发射以后功能测试的一些必要的改动
+## 改双发射以后function test part的一些必要改动
 
+1.inst读入，用doc里的coe_scipt.cpp程序把测试包里的inst_ram改写，然后在项目里进行如下设置
 
+<img src="docs\Cache_1610e1857761cfd.jpg" style="zoom:67%;" />
+
+<img src="docs\Cache_2c77917c2a68f406.jpg" style="zoom:50%;" />
+
+![](docs\Cache_4d2fe7ef86e0ed68.jpg)
+
+2.调整取址相关线路的线宽
+
+3.写回段debug时在高低电平分别检测两条指令执行情况，同时修改test_bench的检测时机，从上沿改成电平检测
 
 ## 设计说明
 
