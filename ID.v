@@ -55,7 +55,7 @@ module ID(
 
     wire launched; 
     wire launch_mode;
-    wire inst2_is_br;
+    wire inst1_is_br,inst2_is_br;
     wire stop_pop;
     reg launch_r;
       
@@ -260,8 +260,6 @@ module ID(
     wire [31:0] hi_rdata, lo_rdata;
     // both hi/lo reg are unique, there is no need to declare twice(i1,i2)
 
-    wire inst1_special, inst2_special, delayslot_special;
-
     decoder u1_decoder(
         .inst_sram_rdata  (inst1               ),
         .rdata1           (rdata1_i1           ),  
@@ -272,7 +270,7 @@ module ID(
         .ex_rf_waddr      (ex_rf_waddr_i1      ),
         .inst_info        (inst1_info_o        ),
         .br_bus           (br_bus1             ),
-        .delayslot_special(inst1_special       ),
+        .next_is_delayslot(inst1_is_br         ),
         .stallreq_for_load(stallreq_for_load_i1),
         .stallreq_for_cp0 (stallreq_for_cp0_i1 ),
         .inst_flag        (inst_flag1          )
@@ -289,7 +287,6 @@ module ID(
         .inst_info        (inst2_info_o        ),
         .br_bus           (br_bus2             ),
         .next_is_delayslot(inst2_is_br         ),
-        .delayslot_special(inst2_special       ),
         .stallreq_for_load(stallreq_for_load_i2),
         .stallreq_for_cp0 (stallreq_for_cp0_i2 ),
         .inst_flag        (inst_flag2          )
@@ -297,10 +294,9 @@ module ID(
 
     assign stallreq_for_load = stallreq_for_load_i1;
     assign stallreq_for_cp0  = stallreq_for_cp0_i1 | stallreq_for_cp0_i2;
-    assign delayslot_special = (br_bus[32] & inst2_special) | (pre_is_br & inst1_special);
     
     assign inst1_info = pre_is_br   ? {inst1_info_o[59:55], 1'b1, inst1_info_o[53:0]} : inst1_info_o;
-    assign inst2_info = br_bus1[32] ? {inst2_info_o[59:55], 1'b1, inst2_info_o[53:0]} : inst2_info_o;
+    assign inst2_info = inst1_is_br ? {inst2_info_o[59:55], 1'b1, inst2_info_o[53:0]} : inst2_info_o;
 
 
 // operate regfile

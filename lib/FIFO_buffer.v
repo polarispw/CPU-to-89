@@ -4,6 +4,7 @@ module Instbuffer(
     input rst,
     input flush,
     input [`STALLBUS_WD-1:0] stall,
+
     // launch
     input  wire issue_mode_i,                     //issue mode of issue stage
     input  wire issue_i,                          //whether issue stage has issued inst
@@ -15,6 +16,7 @@ module Instbuffer(
     output wire issue_inst1_valid_o,
     output wire issue_inst2_valid_o,
     output wire buffer_full_o,
+    
     // inst
     input wire [`InstBus] ICache_inst1_i,
     input wire [`InstBus] ICache_inst2_i,
@@ -26,7 +28,8 @@ module Instbuffer(
     input wire [32:0] bpu_predict_info_i,
     input wire bpu_select_i
 );
-    
+
+// declare  
     wire[32:0] issue_bpu_predict_info_o1;
 
     // queue buffer max volume=32 insts
@@ -39,7 +42,7 @@ module Instbuffer(
     reg [`InstBufferSize-1:0] FIFO_valid; //buffer中每个位置的数据是否有效（高电平有效）
     reg [`STALLBUS_WD-1:0] stall_r;
 
-    // pop after launching
+// pop after launching
     always@(posedge clk)begin
         stall_r <= stall;
         if(rst|flush)begin
@@ -57,7 +60,7 @@ module Instbuffer(
 		end
     end
 	
-	// push back inst
+// push back inst
     always@(posedge clk)begin
         if(rst|flush)begin
             tail <= `InstBufferSizeLog2'h0;
