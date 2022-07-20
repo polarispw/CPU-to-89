@@ -80,7 +80,6 @@ module CP0(
 
 
     reg tick;
-    
     always @ (posedge clk) begin
         if (rst) begin
             tick <= 1'b0;
@@ -138,9 +137,12 @@ module CP0(
 
             interrupt_happen <= ((interrupt != 8'b0) && status[0] && status[1] == 1'b0) ? 1'b1 : 1'b0;
 
-            if(except_happen) begin
-                epc <= is_in_delayslot ? current_pc-32'h4 : current_pc;
-                cause[31] <= is_in_delayslot ? 1'b1 : 1'b0;
+            if(except_happen) begin 
+                if (except_happen && status[1] == 1'b0) begin
+                    status[1] <= 1'b1;
+                    epc <= is_in_delayslot ? current_pc-32'h4 : current_pc;
+                    cause[31] <= is_in_delayslot ? 1'b1 : 1'b0;
+                end
                 case ({interrupt_happen,exceptinfo[9:3]})//interrupt,pc_addr,ades,adel,overflow,syscall,break,invalid_inst
                     8'b1000_0000:begin
                         cause[`ExcCode] <= 5'h0;
@@ -175,7 +177,9 @@ module CP0(
                     end
                 endcase
             end
-            
+            else if (inst_eret) begin
+                status[1] <= 1'b0;
+            end
         end
     end
     
@@ -201,21 +205,15 @@ module CP0(
                         cp0_rdata = epc;
                     end
                     default:begin
-                        
+                        cp0_rdata = `ZeroWord;
                     end
                 endcase
              end
-
-        if (except_happen && status[1] == 1'b0) begin
-            status[1] <= 1'b1;
-        end
-        else if (inst_eret) begin
-            status[1] <= 1'b0;
-        end
     end
 
     assign o_rdata = cp0_rdata;
-    assign new_pc = (status[1] == 1'b1) ? 32'hbfc00380 : epc[31:0];
+    assign new_pc = except_happen ? 32'hbfc00380 :
+                    inst_eret     ? epc[31:0]    : `ZeroWord;
     assign to_be_flushed = except_happen | inst_eret;
 
 endmodule
