@@ -148,7 +148,7 @@ module MEM(
     wire [`MEM_INST_INFO-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
 
     assign rf_wdata_i1 = sel_rf_res_i1 & data_ram_en_i1 ? mem_result_i1 : 
-                         exceptinfo_i_i1[1]             ? cp0_rdata     : ex_result_i1;
+                         exceptinfo_i_i1[36:32] != 5'b0 ? cp0_rdata     : ex_result_i1;
     assign rf_wdata_i2 = sel_rf_res_i2 & data_ram_en_i2 ? mem_result_i2 : ex_result_i2;
 
     assign mem_to_wb_bus_i1 = inst1_valid ?

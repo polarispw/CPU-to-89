@@ -33,35 +33,33 @@ module CP0(
     wire [31:0] bad_addr;
    
     wire we_i, is_delayslot;
+    wire except_happen;
     wire [4:0] waddr, raddr;
-    wire [31:0] excepttype;
+    wire [31:0] excepttype_i, excepttype;
     wire [`EXCEPT_WD-1:0] exceptinfo;
     wire [7:0] interrupt;
 
-    wire except_happen = (exceptinfo_i1[31:0] | exceptinfo_i2[31:0])==`ZeroWord ? 1'b0 : 1'b1;
+    assign except_happen = (exceptinfo_i1[31:0] | exceptinfo_i2[31:0]) != `ZeroWord ? 1'b1 :
+                           (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
 
     assign caused_by_i1 = exceptinfo_i1[31:0]==`ZeroWord ? 1'b0 : 1'b1;//结合to be flushed使用
     assign caused_by_i2 = exceptinfo_i2[31:0]==`ZeroWord ? 1'b0 : 1'b1;
 
-    assign exceptinfo = caused_by_i1 ? exceptinfo_i1 :
-                        caused_by_i2 ? exceptinfo_i2 : `EXCEPT_WD'b0;
-    assign current_pc = caused_by_i1 ? current_pc_i1 :
-                        caused_by_i2 ? current_pc_i2 : 32'b0;
-    assign rt_rdata   = caused_by_i1 ? rt_rdata_i1 :
-                        caused_by_i2 ? rt_rdata_i2 : 32'b0;
-    assign bad_addr   = caused_by_i1 ? rt_rdata_i1 :
-                        caused_by_i2 ? rt_rdata_i2 : 32'b0;
+    assign exceptinfo = caused_by_i2 ? exceptinfo_i2 : exceptinfo_i1;
+    assign current_pc = caused_by_i2 ? current_pc_i2 : current_pc_i1;
+    assign rt_rdata   = rt_rdata_i1;
+    assign bad_addr   = caused_by_i2 ? rt_rdata_i2 : rt_rdata_i1;
 
     assign {
         is_delayslot, // 43
         we_i,         // 42
         waddr,        // 41:37
         raddr,        // 36:32
-        excepttype    // 31:0
+        excepttype_i  // 31:0
     } = exceptinfo;
 
     assign excepttype = (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ?
-                        `INTERRUPT : excepttype;
+                        `INTERRUPT : excepttype_i;
 
     reg tick;
     always @ (posedge clk) begin
@@ -119,7 +117,7 @@ module CP0(
                 endcase
             end
 
-            interrupt_happen <= (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
+            // interrupt_happen <= (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
 
             if(except_happen) begin 
                 if (except_happen && status[1] == 1'b0) begin
@@ -196,10 +194,10 @@ module CP0(
     end
 
     wire inst_eret;
-    assign inst_eret = 1'b0;
+    assign inst_eret = (excepttype==`ERET) ? 1'b1 : 1'b0;
     assign o_rdata = cp0_rdata;
-    assign new_pc = except_happen ? 32'hbfc00380 :
-                    inst_eret     ? epc[31:0]    : `ZeroWord;
+    assign new_pc = inst_eret     ? epc[31:0]    :
+                    except_happen ? 32'hbfc00380 : `ZeroWord;
     assign to_be_flushed = except_happen;
 
 endmodule

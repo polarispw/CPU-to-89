@@ -67,7 +67,7 @@ module sub_ex(
 
     assign alu_src1 = sel_alu_src1[1] ? ex_pc :
                       sel_alu_src1[2] ? sa_zero_extend :
-                      exceptinfo_i[0] ? 32'b0 : rf_rdata1;
+                      exceptinfo_i[42]? 32'b0 : rf_rdata1;
 
     assign alu_src2 = sel_alu_src2[1] ? imm_sign_extend :
                       sel_alu_src2[2] ? 32'd8 :
@@ -247,7 +247,7 @@ module sub_ex(
     wire int_overflow_pos;
     wire except_of_overflow;
     
-    assign is_inst_mfc0 = (exceptinfo_i[36:32]==5'b0) ? 1'b1 : 1'b0;
+    assign is_inst_mfc0 = (exceptinfo_i[36:32]==5'b0) ? 1'b0 : 1'b1;
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
                               (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0010) |  
                               (inst[31:26]==6'b00_1000) ? 1'b1:1'b0;
