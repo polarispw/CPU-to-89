@@ -8,7 +8,7 @@ module decoder(
     input wire last_inst_is_mfc0,
     input wire [4:0] ex_rf_waddr,
 
-    output wire [59:0] inst_info,
+    output wire [87:0] inst_info,
     output wire [32:0] br_bus,
     output wire next_is_delayslot,
     output wire stallreq_for_load,
@@ -357,10 +357,34 @@ module decoder(
         inst_syscall, inst_break, except_of_invalid_inst,
         inst_eret,    inst_mfc0,  inst_mtc0
         };
+
+    wire cp0_we, is_delayslot;
+    wire [4:0] waddr, raddr;
+    wire [31:0] excepttype;
+    wire [`EXCEPT_WD-1:0] except_info;
+
+    assign cp0_we = inst_mtc0;
+    assign is_delayslot = 1'b0;
+    assign waddr = inst_mtc0 ? inst[15:11] : 5'b0;
+    assign raddr = inst_mfc0 ? inst[15:11] : 5'b0;
+
+    assign excepttype = ~(id_pc[1:0] == 2'b0) ? `PCASSERT    :
+                        ~inst_valid           ? `INVALIDINST :
+                        inst_syscall          ? `SYSCALL     :
+                        inst_break            ? `BREAK       :
+                        inst_eret             ? `ERET        : `ZeroWord;
+    
+    assign except_info = {
+        is_delayslot, // 43
+        cp0_we,       // 42
+        waddr,        // 41:37
+        raddr,        // 36:32
+        excepttype    // 31:0
+    };
         
 //output
     assign inst_info = {
-        exceptinfo,     // 59:44
+        except_info,    // 87:44
         mem_op,         // 43:36
         hilo_op,        // 35:28
         alu_op,         // 27:16

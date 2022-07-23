@@ -39,24 +39,24 @@ module MEM(
     wire [31:0] mem_result_i1, mem_result_i2;
     wire [`HILO_WD-1:0] hilo_bus_i1, hilo_bus_i2;
     wire [7:0] mem_op_i1, mem_op_i2;
-    wire [`EXCEPTINFO_WD -1:0] exceptinfo_i_i1, exceptinfo_i_i2;
+    wire [`EXCEPT_WD -1:0] exceptinfo_i_i1, exceptinfo_i_i2;
     wire inst1_valid, inst2_valid;
 
     assign {
-        inst2_valid,       // 335
-        inst1_valid,       // 334
-        exceptinfo_i_i2,   // 333:318
-        mem_op_i2,         // 317:310
-        hilo_bus_i2,       // 309:244
-        mem_pc_i2,         // 243:212
-        data_ram_en_i2,    // 211
-        data_ram_wen_i2,   // 210
-        data_ram_sel_i2,   // 209:206
-        sel_rf_res_i2,     // 205
-        rf_we_i2,          // 204
-        rf_waddr_i2,       // 203:199
-        ex_result_i2,      // 198:167
-        exceptinfo_i_i1,   // 166:151
+        inst2_valid,       // 391
+        inst1_valid,       // 390
+        exceptinfo_i_i2,   // 389:346
+        mem_op_i2,         // 345:338
+        hilo_bus_i2,       // 337:272
+        mem_pc_i2,         // 271:240
+        data_ram_en_i2,    // 239
+        data_ram_wen_i2,   // 238
+        data_ram_sel_i2,   // 237:234
+        sel_rf_res_i2,     // 233
+        rf_we_i2,          // 232
+        rf_waddr_i2,       // 231:227
+        ex_result_i2,      // 226:195
+        exceptinfo_i_i1,   // 194:151
         mem_op_i1,         // 150:143
         hilo_bus_i1,       // 142:77
         mem_pc_i1,         // 76:45
@@ -67,7 +67,7 @@ module MEM(
         rf_we_i1,          // 37
         rf_waddr_i1,       // 36:32
         ex_result_i1       // 31:0
-    } =  ex_to_mem_bus_r[335:0];
+    } =  ex_to_mem_bus_r[391:0];
 
 
 // load data
@@ -134,8 +134,6 @@ module MEM(
         .current_pc_i2  (mem_pc_i2       ),
         .rt_rdata_i1    (ex_result_i1    ),
         .rt_rdata_i2    (ex_result_i2    ),
-        .bad_addr_i1    (ex_result_i1    ),
-        .bad_addr_i2    (ex_result_i2    ),
         
         .o_rdata        (cp0_rdata       ),
         .new_pc         (new_pc          ),

@@ -232,8 +232,8 @@ module ID(
 
 // decode instructions
 
-    wire [59:0] inst1_info_o, inst2_info_o;
-    wire [59:0] inst1_info, inst2_info;
+    wire [87:0] inst1_info_o, inst2_info_o;
+    wire [87:0] inst1_info, inst2_info;
     wire [2:0] inst_flag1, inst_flag2;
     wire [4:0] rs_i1, rs_i2, rt_i1, rt_i2;
     wire stallreq_for_cp0_i1, stallreq_for_cp0_i2;
@@ -295,8 +295,8 @@ module ID(
     assign stallreq_for_load = stallreq_for_load_i1;
     assign stallreq_for_cp0  = stallreq_for_cp0_i1 | stallreq_for_cp0_i2;
     
-    assign inst1_info = pre_is_br   ? {inst1_info_o[59:55], 1'b1, inst1_info_o[53:0]} : inst1_info_o;
-    assign inst2_info = inst1_is_br ? {inst2_info_o[59:55], 1'b1, inst2_info_o[53:0]} : inst2_info_o;
+    assign inst1_info = pre_is_br   ? {1'b1, inst1_info_o[86:0]} : inst1_info_o;
+    assign inst2_info = inst1_is_br ? {1'b1, inst2_info_o[86:0]} : inst2_info_o;
 
 
 // operate regfile
@@ -401,8 +401,8 @@ module ID(
     assign launch_mode = br_bus1[32]                     ? `DualIssue   :
                          (data_corelate | inst_conflict) ? `SingleIssue : 
                          inst2_is_br                     ? `SingleIssue : 
-                         inst2_info[53]                  ? `SingleIssue :
-                         inst2_info[47]                  ? `SingleIssue :
+                        //  inst2_info[53]                  ? `SingleIssue :
+                        //  inst2_info[47]                  ? `SingleIssue :
                          ~inst2_valid                    ? `SingleIssue : `DualIssue;     
     assign launched = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
 
@@ -428,7 +428,7 @@ module ID(
 
     assign inst1_bus = inst1_launch ?
     {
-        inst1_info[59:28],// 251:220
+        inst1_info[87:28],// 251:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
         inst1_pc,         // 155:124
@@ -436,11 +436,11 @@ module ID(
         inst1_info[27:0], // 91:64
         rdata2_i1,        // 63:32
         rdata1_i1         // 31:0
-    } : {95'b0,inst1_pc_r,124'b0};
+    } : {124'b0,inst1_pc_r,124'b0};
 
     assign inst2_bus = inst2_launch ?
     {
-        inst2_info[59:28],// 251:220
+        inst2_info[87:28],// 279:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
         inst2_pc,         // 155:124
@@ -448,10 +448,14 @@ module ID(
         inst2_info[27:0], // 91:64
         rdata2_i2,        // 63:32
         rdata1_i2         // 31:0
-    } : {95'b0,inst2_pc_r,124'b0};
+    } : {124'b0,inst2_pc_r,124'b0};
 
     /*wire notes
-    exceptinfo,     // 251:236
+    is_delayslot,   // 279
+    we_i,           // 278
+    waddr,          // 277:273
+    raddr,          // 272:268
+    excepttype      // 267:236
     mem_op,         // 235:228
     hilo_op,        // 227:220
     hi_rdata,       // 219:188

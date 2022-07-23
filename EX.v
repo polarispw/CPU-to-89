@@ -49,9 +49,9 @@ module EX(
     wire [31:0] data_sram_wdata_i1, data_sram_wdata_i2;
 
     assign {inst2_valid, inst1_valid} = id_to_ex_bus_r[1:0];
-    assign inst1_bus = id_to_ex_bus_r[253:2]  ;
-    assign inst2_bus = id_to_ex_bus_r[505:254];
-    assign switch = id_to_ex_bus_r[506];
+    assign inst1_bus = id_to_ex_bus_r[281:2]  ;
+    assign inst2_bus = id_to_ex_bus_r[561:282];
+    assign switch = id_to_ex_bus_r[562];
 
     sub_ex u1_sub_ex(
         .rst            (rst               ),

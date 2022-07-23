@@ -2,8 +2,8 @@
 module CP0(
     input wire rst,
     input wire clk,
-    input wire [`EXCEPTINFO_WD-1:0] exceptinfo_i1,
-    input wire [`EXCEPTINFO_WD-1:0] exceptinfo_i2,
+    input wire [`EXCEPT_WD-1:0] exceptinfo_i1,
+    input wire [`EXCEPT_WD-1:0] exceptinfo_i2,
     input wire [31:0] current_pc_i1,
     input wire [31:0] current_pc_i2,
     input wire [31:0] rt_rdata_i1,
@@ -28,56 +28,40 @@ module CP0(
     reg [31:0] cp0_rdata;
     reg interrupt_happen;
 
-    wire [`EXCEPTINFO_WD-1:0] exceptinfo;
     wire [31:0] current_pc;
     wire [31:0] rt_rdata;
     wire [31:0] bad_addr;
    
-    wire is_in_delayslot;
-    wire except_of_pc_addr;
-    wire adel;
-    wire ades;
-    wire except_of_overflow;
-    wire except_of_syscall;
-    wire except_of_break;
-    wire except_of_invalid_inst;
-    wire inst_eret;
-    wire inst_mfc0;
-    wire inst_mtc0;
-    wire [4:0] target_addr;
+    wire we_i, is_delayslot;
+    wire [4:0] waddr, raddr;
+    wire [31:0] excepttype;
+    wire [`EXCEPT_WD-1:0] exceptinfo;
     wire [7:0] interrupt;
-    wire except_happen = except_of_overflow | except_of_syscall | except_of_break |
-                         except_of_pc_addr  | adel | ades | except_of_invalid_inst|
-                         interrupt_happen;
 
-    assign exceptinfo   = exceptinfo_i1 | exceptinfo_i2;
-    assign caused_by_i1 = exceptinfo==exceptinfo_i1 ? 1'b1 : 1'b0;//结合to be flushed使用
-    assign caused_by_i2 = exceptinfo_i2[9:3] == 7'b0 ? 1'b0 : 1'b1;
+    wire except_happen = (exceptinfo_i1[31:0] | exceptinfo_i2[31:0])==`ZeroWord ? 1'b0 : 1'b1;
 
+    assign caused_by_i1 = exceptinfo_i1[31:0]==`ZeroWord ? 1'b0 : 1'b1;//结合to be flushed使用
+    assign caused_by_i2 = exceptinfo_i2[31:0]==`ZeroWord ? 1'b0 : 1'b1;
+
+    assign exceptinfo = caused_by_i1 ? exceptinfo_i1 :
+                        caused_by_i2 ? exceptinfo_i2 : `EXCEPT_WD'b0;
     assign current_pc = caused_by_i1 ? current_pc_i1 :
                         caused_by_i2 ? current_pc_i2 : 32'b0;
-    assign rt_rdata = caused_by_i1 ? rt_rdata_i1 :
-                      caused_by_i2 ? rt_rdata_i2 : 32'b0;
-    assign bad_addr = caused_by_i1 ? bad_addr_i1 :
-                      caused_by_i2 ? bad_addr_i2 : 32'b0;
+    assign rt_rdata   = caused_by_i1 ? rt_rdata_i1 :
+                        caused_by_i2 ? rt_rdata_i2 : 32'b0;
+    assign bad_addr   = caused_by_i1 ? rt_rdata_i1 :
+                        caused_by_i2 ? rt_rdata_i2 : 32'b0;
 
     assign {
-        target_addr,            //15:11
-        is_in_delayslot,        //10
-        except_of_pc_addr,      //9
-        ades,                   //8
-        adel,                   //7
-        except_of_overflow,     //6
-        except_of_syscall,      //5
-        except_of_break,        //4
-        except_of_invalid_inst, //3
-        inst_eret,              //2
-        inst_mfc0,              //1
-        inst_mtc0               //0
+        is_delayslot, // 43
+        we_i,         // 42
+        waddr,        // 41:37
+        raddr,        // 36:32
+        excepttype    // 31:0
     } = exceptinfo;
 
-    assign interrupt = cause[15:8]&status[15:8];
-
+    assign excepttype = (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ?
+                        `INTERRUPT : excepttype;
 
     reg tick;
     always @ (posedge clk) begin
@@ -108,8 +92,8 @@ module CP0(
                 cause[15] <= 1'b1;
             end
 
-            if (inst_mtc0) begin
-                case (target_addr)
+            if (we_i) begin
+                case (waddr)
                     `CP0_REG_COUNT:begin
                         count <= rt_rdata;
                     end
@@ -135,50 +119,50 @@ module CP0(
                 endcase
             end
 
-            interrupt_happen <= ((interrupt != 8'b0) && status[0] && status[1] == 1'b0) ? 1'b1 : 1'b0;
+            interrupt_happen <= (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
 
             if(except_happen) begin 
                 if (except_happen && status[1] == 1'b0) begin
                     status[1] <= 1'b1;
-                    epc <= is_in_delayslot ? current_pc-32'h4 : current_pc;
-                    cause[31] <= is_in_delayslot ? 1'b1 : 1'b0;
+                    cause[31] <= is_delayslot ? 1'b1 : 1'b0;
+                    epc       <= is_delayslot ? current_pc-32'h4 : current_pc;
                 end
-                case ({interrupt_happen,exceptinfo[9:3]})//interrupt,pc_addr,ades,adel,overflow,syscall,break,invalid_inst
-                    8'b1000_0000:begin
+                case (excepttype)
+                    `INTERRUPT:begin
                         cause[`ExcCode] <= 5'h0;
                         badvaddr <= current_pc; 
                     end
-                    8'b0100_0000:begin
+                    `PCASSERT:begin
                         cause[`ExcCode] <= 5'h4;
                         badvaddr <= current_pc; 
                     end
-                    8'b0010_0000:begin
-                        cause[`ExcCode] <= 5'h5;
-                        badvaddr <= bad_addr; 
-                    end
-                    8'b0001_0000:begin
+                    `LOADASSERT:begin
                         cause[`ExcCode] <= 5'h4;
                         badvaddr <= bad_addr; 
                     end
-                    8'b0000_1000:begin
-                        cause[`ExcCode] <= 5'hc;
+                    `STOREASSERT:begin
+                        cause[`ExcCode] <= 5'h5;
+                        badvaddr <= bad_addr; 
                     end
-                    8'b0000_0100:begin
+                    `SYSCALL:begin
                         cause[`ExcCode] <= 5'h8;
                     end
-                    8'b0000_0010:begin
+                    `BREAK:begin
                         cause[`ExcCode] <= 5'h9;
                     end
-                    8'b0000_0001:begin
+                    `INVALIDINST:begin
                         cause[`ExcCode] <= 5'ha;
+                    end
+                    `OV:begin
+                        cause[`ExcCode] <= 5'hc;
+                    end
+                    `ERET:begin
+                        status[1] <= 1'b0;
                     end
                     default:begin
                         
                     end
                 endcase
-            end
-            else if (inst_eret) begin
-                status[1] <= 1'b0;
             end
         end
     end
@@ -187,33 +171,35 @@ module CP0(
         if (rst) begin
             cp0_rdata <= `ZeroWord;
         end
-        else if (inst_mfc0) begin
-                case (target_addr)
-                    `CP0_REG_BADADDR:begin
-                        cp0_rdata = badvaddr;
-                    end 
-                    `CP0_REG_COUNT:begin
-                        cp0_rdata = count;
-                    end
-                    `CP0_REG_STATUS:begin
-                        cp0_rdata = status;
-                    end
-                    `CP0_REG_CAUSE:begin
-                        cp0_rdata = cause;
-                    end
-                    `CP0_REG_EPC:begin
-                        cp0_rdata = epc;
-                    end
-                    default:begin
-                        cp0_rdata = `ZeroWord;
-                    end
-                endcase
-             end
+        else begin
+            case (raddr)
+                `CP0_REG_BADADDR:begin
+                    cp0_rdata = badvaddr;
+                end 
+                `CP0_REG_COUNT:begin
+                    cp0_rdata = count;
+                end
+                `CP0_REG_STATUS:begin
+                    cp0_rdata = status;
+                end
+                `CP0_REG_CAUSE:begin
+                    cp0_rdata = cause;
+                end
+                `CP0_REG_EPC:begin
+                    cp0_rdata = epc;
+                end
+                default:begin
+                    cp0_rdata = `ZeroWord;
+                end
+            endcase
+        end
     end
 
+    wire inst_eret;
+    assign inst_eret = 1'b0;
     assign o_rdata = cp0_rdata;
     assign new_pc = except_happen ? 32'hbfc00380 :
                     inst_eret     ? epc[31:0]    : `ZeroWord;
-    assign to_be_flushed = except_happen | inst_eret;
+    assign to_be_flushed = except_happen;
 
 endmodule
