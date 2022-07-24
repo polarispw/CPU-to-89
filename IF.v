@@ -9,7 +9,7 @@ module IF(
 
     input wire [`BR_WD-1:0] br_bus,
 
-    output wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
+    output wire [`IF_TO_IB_WD-1:0] if_to_ib_bus,
 
     output wire inst_sram_en,
     output wire [3:0] inst_sram_wen,
@@ -66,7 +66,7 @@ module IF(
     assign next_pc = flush ? new_pc  :
                      br_e  ? br_addr : pc_reg + 32'd8;
 
-    assign if_to_id_bus = {
+    assign if_to_ib_bus = {
         discard_following_inst,
         ce_reg,
         pc_idef,
