@@ -5,7 +5,8 @@ module ID(
     input wire flush,
     input wire [`STALLBUS_WD-1:0] stall,
    
-    input wire [`IB_TO_ID_WD-1:0] ib_to_id_bus,
+    input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
+    input wire [63:0] inst_sram_rdata,
 
     input wire [`EX_TO_RF_WD-1:0]  ex_to_rf_bus,
     input wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
@@ -13,41 +14,117 @@ module ID(
 
     output wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
     output wire [`BR_WD-1:0] br_bus,
-    output wire launched,
-    output wire launch_mode,
     output wire stallreq_for_load,
-    output wire stallreq_for_cp0
+    output wire stallreq_for_cp0,
+    output wire stallreq_for_bru,
+    output wire stallreq_for_fifo
 );
 
+// IF to FIFO
 
-// IB to ID
-
-    reg [`IB_TO_ID_WD-1:0] ib_to_id_bus_r;
+    reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;
   
     always @ (posedge clk) begin
-        if (rst |flush) begin
-            ib_to_id_bus_r <= `IB_TO_ID_WD'b0;
+        if (rst) begin
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;
         end
-        else if (stall[2]==`Stop && stall[3]==`NoStop) begin
-            ib_to_id_bus_r <= `IB_TO_ID_WD'b0;//考虑stall
+        else if (flush) begin
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;
         end
-        else if (stall[2]==`NoStop) begin
-            ib_to_id_bus_r <= ib_to_id_bus;
+        else if (stall[1]==`Stop && stall[2]==`NoStop) begin
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;//考虑stall
+        end
+        else if (stall[1]==`NoStop) begin
+            if_to_id_bus_r <= if_to_id_bus;
         end
     end
+
+
+// FIFO inst buffer
+
+    wire [31:0] inst1_in, inst2_in;
+    wire [31:0] inst1_in_pc, inst2_in_pc;
+    wire inst1_in_val, inst2_in_val;
+      
+    wire ce, discard_current_inst;
+    wire [31:0] id_pc, pc_idef;
+    wire matched, inst1_matched, inst2_matched;
+    reg [31:0] pc_to_match;
+    reg match_pc_en;
 
     wire [31:0] inst1, inst2;
     wire [31:0] inst1_pc, inst2_pc;
     wire inst1_valid, inst2_valid;
+    wire fifo_full;
 
-    assign {
-        inst2_valid,
-        inst2_pc,
-        inst2,
-        inst1_valid,
-        inst1_pc,
-        inst1
-    } = ib_to_id_bus_r;
+    wire launched; 
+    wire launch_mode;
+    wire inst1_is_br,inst2_is_br;
+    wire stop_pop;
+    reg launch_r;
+
+    assign {discard_current_inst, ce, pc_idef, id_pc} = if_to_id_bus_r;
+
+    always @(posedge clk) begin
+        if (rst | flush) begin
+            match_pc_en <= 1'b0;
+            pc_to_match <= 32'b0;
+        end
+        else if(br_bus[32] & ~match_pc_en) begin
+            pc_to_match <= br_bus[31:0];
+        end
+        else if(discard_current_inst & ~match_pc_en & (pc_to_match[1:0]==2'b0)) begin
+            match_pc_en <= 1'b1;
+        end
+        else if(match_pc_en & matched) begin
+            match_pc_en <= 1'b0;
+            pc_to_match <= 32'b0;
+        end
+    end
+
+    assign inst1_in = inst_sram_rdata[31: 0];
+    assign inst2_in = inst_sram_rdata[63:32];
+
+    assign inst1_in_pc = id_pc;
+    assign inst2_in_pc = inst1_in_val ? id_pc+32'd4 : pc_idef;
+
+    assign inst1_matched = ~match_pc_en | (match_pc_en && inst1_in_pc==pc_to_match);
+    assign inst2_matched = ~match_pc_en | (match_pc_en && inst2_in_pc==pc_to_match);
+    assign matched = inst1_matched | inst2_matched;
+
+    assign inst1_in_val = ~ce                  ? 1'b0 :
+                          id_pc != pc_idef     ? 1'b0 :
+                          discard_current_inst ? 1'b0 : 
+                          ~inst1_matched       ? 1'b0 : 1'b1;
+    assign inst2_in_val = ~ce                  ? 1'b0 :
+                          id_pc == 32'b0       ? 1'b0 :
+                          discard_current_inst ? 1'b0 : 
+                          ~matched             ? 1'b0 : 1'b1;
+
+    assign stallreq_for_fifo = fifo_full & ~br_bus[32];// 队满时要发射的如果恰好是跳转则不能stall 要让IF取址(队列已留出冗余不会真的溢出)
+    
+    Instbuffer FIFO_buffer(
+        .clk                  (clk               ),
+        .rst                  (rst               ),
+        .flush                (flush | br_bus[32]),
+        .stall                ({stall[5:3],stop_pop,stall[1:0]}), 
+        .issue_i              (launch_r          ),
+        .issue_mode_i         (launch_mode       ),
+        .ICache_inst1_i       (inst1_in          ),
+        .ICache_inst2_i       (inst2_in          ),
+        .ICache_inst1_addr_i  (inst1_in_pc       ),
+        .ICache_inst2_addr_i  (inst2_in_pc       ),
+        .ICache_inst1_valid_i (inst1_in_val      ),
+        .ICache_inst2_valid_i (inst2_in_val      ),
+
+        .issue_inst1_o        (inst1             ),
+        .issue_inst2_o        (inst2             ),
+        .issue_inst1_addr_o   (inst1_pc          ),
+        .issue_inst2_addr_o   (inst2_pc          ),
+        .issue_inst1_valid_o  (inst1_valid       ),
+        .issue_inst2_valid_o  (inst2_valid       ),         
+        .buffer_full_o        (fifo_full         )
+    );
 
 
 // bypass and WB signal
@@ -301,24 +378,24 @@ module ID(
                            (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) || (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
 
-    assign launch_mode   = br_bus1[32]   ? `DualIssue   :
-                           data_corelate ? `SingleIssue : 
-                           inst_conflict ? `SingleIssue : 
-                           inst2_is_br   ? `SingleIssue :
-                           ~inst2_valid  ? `SingleIssue : `DualIssue;    
+    assign launch_mode   = br_bus1[32]                     ? `DualIssue   :
+                           data_corelate                   ? `SingleIssue : 
+                           inst_conflict                   ? `SingleIssue : 
+                           inst2_is_br                     ? `SingleIssue :
+                           ~inst2_valid                    ? `SingleIssue : `DualIssue;    
+                           
+    assign launched      = (inst1_valid | inst2_valid) & ~stallreq_for_cp0;
 
-    assign launched      = (inst1_valid | inst2_valid) & ~stallreq_for_cp0 & ~stall[2];
+    always@(*)begin
+        if(rst | flush) begin
+            launch_r <= 1'b0;
+        end
+        else begin
+            launch_r <= launched;
+        end
+    end
 
-    // always@(*)begin
-    //     if(rst | flush) begin
-    //         launch_r <= 1'b0;
-    //     end
-    //     else begin
-    //         launch_r <= launched;
-    //     end
-    // end
-
-    // assign stop_pop = (stall[2]) | inst1_info[28] | inst1_info[29];// stall或发射除法后不再弹出
+    assign stop_pop = (stall[2]) | inst1_info[28] | inst1_info[29];// stall或发射除法后不再弹出
 
 
 // output part

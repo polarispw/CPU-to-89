@@ -2,6 +2,7 @@
 module CTRL(
     input wire rst,
     input wire stallreq_for_ex,
+    input wire stallreq_for_bru,
     input wire stallreq_for_load,
     input wire stallreq_for_cp0,
     input wire stallreq_for_fifo,
@@ -18,7 +19,7 @@ module CTRL(
         else if (stallreq_for_ex) begin
             stall = `STALLBUS_WD'b111_101;
         end
-        else if (stallreq_for_cp0) begin
+        else if (stallreq_for_bru | stallreq_for_cp0) begin
             stall = `STALLBUS_WD'b001_101;
         end
         else if (stallreq_for_load) begin

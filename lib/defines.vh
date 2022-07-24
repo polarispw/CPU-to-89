@@ -1,6 +1,5 @@
 //BUS BETWEEN MODULES
-`define IF_TO_IB_WD 66
-`define IB_TO_ID_WD 130
+`define IF_TO_ID_WD 66
 `define ID_TO_EX_WD 563
 `define EX_TO_MEM_WD 393
 `define MEM_TO_WB_WD 272

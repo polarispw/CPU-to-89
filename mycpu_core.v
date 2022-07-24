@@ -23,16 +23,13 @@ module mycpu_core(
 );
 
     // forward
-    wire [`IF_TO_IB_WD-1 :0] if_to_ib_bus;
-    wire [`IB_TO_ID_WD-1 :0] ib_to_id_bus;
+    wire [`IF_TO_ID_WD-1 :0] if_to_id_bus;
     wire [`ID_TO_EX_WD-1 :0] id_to_ex_bus;
     wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus;
     wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus;
 
     // backward
     wire [`BR_WD-1       :0] br_bus; 
-    wire launched;
-    wire launch_mode;
     wire [`EX_TO_RF_WD-1 :0] ex_to_rf_bus;
     wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus;
     wire [`WB_TO_RF_WD-1 :0] wb_to_rf_bus;
@@ -41,6 +38,7 @@ module mycpu_core(
     wire [`STALLBUS_WD-1:0] stall;
     wire stallreq_for_load;
     wire stallreq_for_cp0;
+    wire stallreq_for_bru;
     wire stallreq_for_ex;
     wire stallreq_for_fifo;
     
@@ -56,25 +54,11 @@ module mycpu_core(
         .flush           (flush           ),
         .new_pc          (new_pc          ),   
         .br_bus          (br_bus          ),
-        .if_to_ib_bus    (if_to_ib_bus    ),
+        .if_to_id_bus    (if_to_id_bus    ),
         .inst_sram_en    (inst_sram_en    ),
         .inst_sram_wen   (inst_sram_wen   ),
         .inst_sram_addr  (inst_sram_addr  ),
         .inst_sram_wdata (inst_sram_wdata )
-    );
-
-    Instbuffer u_IB(
-        .clk                (clk               ),
-        .rst                (rst               ),
-        .flush              (flush | br_bus[32]),
-        .stall              (stall             ),
-        .br_bus             (br_bus            ),
-        .inst_sram_rdata    (inst_sram_rdata   ),
-        .if_to_ib_bus       (if_to_ib_bus      ), 
-        .issue_i            (launched          ),
-        .issue_mode_i       (launch_mode       ),
-        .ib_to_id_bus       (ib_to_id_bus      ),
-        .stallreq_for_fifo  (stallreq_for_fifo )
     );
     
     ID u_ID(
@@ -82,16 +66,17 @@ module mycpu_core(
         .rst                (rst               ),
         .flush              (flush             ),
         .stall              (stall             ),
-        .ib_to_id_bus       (ib_to_id_bus      ),
+        .stallreq_for_load  (stallreq_for_load ),
+        .stallreq_for_cp0   (stallreq_for_cp0  ),
+        .stallreq_for_bru   (stallreq_for_bru  ),
+        .stallreq_for_fifo  (stallreq_for_fifo ),
+        .if_to_id_bus       (if_to_id_bus      ),
+        .inst_sram_rdata    (inst_sram_rdata   ),
         .ex_to_rf_bus       (ex_to_rf_bus      ),
         .mem_to_rf_bus      (mem_to_rf_bus     ),
         .wb_to_rf_bus       (wb_to_rf_bus      ),
         .id_to_ex_bus       (id_to_ex_bus      ),
-        .br_bus             (br_bus            ),
-        .launched           (launched          ),
-        .launch_mode        (launch_mode       ),
-        .stallreq_for_load  (stallreq_for_load ),
-        .stallreq_for_cp0   (stallreq_for_cp0  )
+        .br_bus             (br_bus            )
     );
 
     EX u_EX(
@@ -137,6 +122,7 @@ module mycpu_core(
     CTRL u_CTRL(
     	.rst               (rst               ),
         .stallreq_for_ex   (stallreq_for_ex   ),
+        .stallreq_for_bru  (stallreq_for_bru  ),
         .stallreq_for_load (stallreq_for_load ),
         .stallreq_for_cp0  (stallreq_for_cp0  ),
         .stallreq_for_fifo (stallreq_for_fifo ),
