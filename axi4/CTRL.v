@@ -6,6 +6,7 @@ module CTRL(
     input wire stallreq_for_load,
     input wire stallreq_for_cp0,
     input wire stallreq_for_fifo,
+    input wire stallreq_for_cache,
     input wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus,
 
     output reg flush,
@@ -16,7 +17,7 @@ module CTRL(
         if (rst | flush) begin
             stall = `STALLBUS_WD'b0;
         end
-        else if (stallreq_for_ex) begin
+        else if (stallreq_for_ex | stallreq_for_cache) begin
             stall = `STALLBUS_WD'b111_101;
         end
         else if (stallreq_for_bru | stallreq_for_cp0) begin
