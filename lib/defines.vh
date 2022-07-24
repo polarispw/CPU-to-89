@@ -55,20 +55,20 @@
 // CP0
 `define ExcCode 6:2
 `define PrioCode 11:8
-`define CP0_REG_COUNT      5'b01001          //可读写
-`define CP0_REG_COMPARE    5'b01011          //可读写
-`define CP0_REG_STATUS     5'b01100          //可读写
-`define CP0_REG_CAUSE      5'b01101          //只读
-`define CP0_REG_EPC        5'b01110          //可读写
-`define CP0_REG_CONFIG     5'b10000          //只读
-`define CP0_REG_BADADDR    5'b01000
-`define INTERRUPT          32'h00000501
-`define LOADASSERT         32'h00000104
-`define PCASSERT           32'h00000404
-`define STOREASSERT        32'h00000105
-`define SYSCALL            32'h00000208
-`define BREAK              32'h00000509
-`define INVALIDINST        32'h0000030a
-`define TRAP               32'h0000020d
-`define OV                 32'h0000020c
-`define ERET               32'h0000050e
+`define CP0_REG_COUNT    5'b01001          //可读写
+`define CP0_REG_COMPARE  5'b01011          //可读写
+`define CP0_REG_STATUS   5'b01100          //可读写
+`define CP0_REG_CAUSE    5'b01101          //只读
+`define CP0_REG_EPC      5'b01110          //可读写
+`define CP0_REG_CONFIG   5'b10000          //只读
+`define CP0_REG_BADADDR  5'b01000
+`define INTERRUPT        32'h00000501
+`define LOADASSERT       32'h00000104
+`define PCASSERT         32'h00000404
+`define STOREASSERT      32'h00000105
+`define SYSCALL          32'h00000208
+`define BREAK            32'h00000509
+`define INVALIDINST      32'h0000030a
+`define TRAP             32'h0000020d
+`define OV               32'h0000020c
+`define ERET             32'h0000050e
