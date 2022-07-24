@@ -45,10 +45,15 @@ module ID(
     wire [31:0] inst1_in, inst2_in;
     wire [31:0] inst1_in_pc, inst2_in_pc;
     wire inst1_in_val, inst2_in_val;
+      
+    wire ce, discard_current_inst;
+    wire [31:0] id_pc, pc_idef;
+    wire matched, inst1_matched, inst2_matched;
+    reg [31:0] pc_to_match;
+    reg match_pc_en;
 
     wire [31:0] inst1, inst2;
     wire [31:0] inst1_pc, inst2_pc;
-    wire [31:0] inst1_pc_o, inst2_pc_o;
     wire inst1_valid, inst2_valid;
     wire fifo_full;
 
@@ -57,14 +62,9 @@ module ID(
     wire inst1_is_br,inst2_is_br;
     wire stop_pop;
     reg launch_r;
-      
-    wire ce, discard_current_inst;
-    wire [31:0] id_pc, pc_idef;
-    wire matched, inst1_matched, inst2_matched;
-    reg [31:0] pc_to_match;
-    reg match_pc_en;
 
     assign {discard_current_inst, ce, pc_idef, id_pc} = if_to_id_bus_r;
+
     always @(posedge clk) begin
         if (rst | flush) begin
             match_pc_en <= 1'b0;
@@ -119,42 +119,15 @@ module ID(
 
         .issue_inst1_o        (inst1             ),
         .issue_inst2_o        (inst2             ),
-        .issue_inst1_addr_o   (inst1_pc_o        ),
-        .issue_inst2_addr_o   (inst2_pc_o        ),
+        .issue_inst1_addr_o   (inst1_pc          ),
+        .issue_inst2_addr_o   (inst2_pc          ),
         .issue_inst1_valid_o  (inst1_valid       ),
         .issue_inst2_valid_o  (inst2_valid       ),         
         .buffer_full_o        (fifo_full         )
     );
 
-    reg [31:0] inst1_pc_r, inst2_pc_r;
-    reg last_inst_is_br, pre_is_br;//后者控制单发射时的延迟槽
-    wire [32:0] br_bus1, br_bus2;
 
-    always @(posedge clk) begin
-        if(rst | flush | ~br_bus[32]) begin
-            last_inst_is_br <= 1'b0;
-            inst1_pc_r <= 32'b0;
-            inst2_pc_r <= 32'b0;
-        end
-        else if(br_bus[32]) begin
-            last_inst_is_br <= 1'b1;
-            inst1_pc_r <= inst1_pc_o;
-            inst2_pc_r <= inst2_pc_o;
-        end
-
-        if(rst | flush | br_bus1[31:0]==32'b0) begin
-            pre_is_br <= 1'b0;
-        end
-        else if(br_bus1[31:0]!=32'b0 & launch_mode==`SingleIssue) begin
-            pre_is_br <= 1'b1;
-        end
-    end
-
-    assign inst1_pc = last_inst_is_br ? inst1_pc_r : inst1_pc_o;
-    assign inst2_pc = last_inst_is_br ? inst2_pc_r : inst2_pc_o;
-
-
-// bypass and WB signal declare 
+// bypass and WB signal
 
     wire ex_rf_we_i1, mem_rf_we_i1, wb_rf_we_i1;
     wire ex_rf_we_i2, mem_rf_we_i2, wb_rf_we_i2;
@@ -253,8 +226,8 @@ module ID(
     wire [31:0] rdata1_i2, rdata2_i2;
     
     wire [31:0] hi_o, lo_o;
-    wire [31:0] hi_rdata, lo_rdata;
-    // both hi/lo reg are unique, there is no need to declare twice(i1,i2)
+    wire [31:0] hi_rdata, lo_rdata; 
+    wire [32:0] br_bus1, br_bus2;
 
     decoder u1_decoder(
         .inst_sram_rdata  (inst1               ),
@@ -287,6 +260,17 @@ module ID(
         .stallreq_for_cp0 (stallreq_for_cp0_i2 ),
         .inst_flag        (inst_flag2          )
     );
+
+    reg pre_is_br;//控制单发射时的延迟槽
+
+    always @(posedge clk) begin
+        if(rst | flush | ~inst1_is_br) begin
+            pre_is_br <= 1'b0;
+        end
+        else if(inst1_is_br & launch_mode==`SingleIssue) begin
+            pre_is_br <= 1'b1;
+        end
+    end
 
     assign stallreq_for_load = stallreq_for_load_i1;
     assign stallreq_for_cp0  = stallreq_for_cp0_i1 | stallreq_for_cp0_i2;
@@ -392,13 +376,15 @@ module ID(
                            (sel_i1_src2[0] & rf_we_i2 & (rf_waddr_i2==rt_i1)) | // i1 read reg[rt] & i2 write reg[rt]
                            (sel_i2_src1[0] & rf_we_i1 & (rf_waddr_i1==rs_i2)) | // i2 read reg[rs] & i1 write reg[rs]
                            (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
-
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) || (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
+
     assign launch_mode   = br_bus1[32]                     ? `DualIssue   :
-                           (data_corelate | inst_conflict) ? `SingleIssue : 
+                           data_corelate                   ? `SingleIssue : 
+                           inst_conflict                   ? `SingleIssue : 
                            inst2_is_br                     ? `SingleIssue :
-                           ~inst2_valid                    ? `SingleIssue : `DualIssue;     
-    assign launched      = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
+                           ~inst2_valid                    ? `SingleIssue : `DualIssue;    
+                           
+    assign launched      = (inst1_valid | inst2_valid) & ~stallreq_for_cp0;
 
     always@(*)begin
         if(rst | flush) begin
@@ -430,7 +416,7 @@ module ID(
         inst1_info[27:0], // 91:64
         rdata2_i1,        // 63:32
         rdata1_i1         // 31:0
-    } : {124'b0,inst1_pc_r,124'b0};
+    } : {124'b0,inst1_pc,124'b0};
 
     assign inst2_bus = inst2_launch ?
     {
@@ -442,7 +428,7 @@ module ID(
         inst2_info[27:0], // 91:64
         rdata2_i2,        // 63:32
         rdata1_i2         // 31:0
-    } : {124'b0,inst2_pc_r,124'b0};
+    } : {124'b0,inst2_pc,124'b0};
 
     /*wire notes
     is_delayslot,   // 279
