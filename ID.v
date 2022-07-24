@@ -20,7 +20,7 @@ module ID(
     output wire stallreq_for_fifo
 );
 
-// Inst to FIFO
+// IF to FIFO
 
     reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;
   
@@ -398,13 +398,11 @@ module ID(
                            (sel_i2_src2[0] & rf_we_i1 & (rf_waddr_i1==rt_i2)) ; // i2 read reg[rt] & i1 write reg[rt]
 
     assign inst_conflict = (inst_flag1[2:0]!=3'b0) || (inst_flag2[2:0]!=3'b0) ? 1'b1 : 1'b0;
-    assign launch_mode = br_bus1[32]                     ? `DualIssue   :
-                         (data_corelate | inst_conflict) ? `SingleIssue : 
-                         inst2_is_br                     ? `SingleIssue : 
-                        //  inst2_info[53]                  ? `SingleIssue :
-                        //  inst2_info[47]                  ? `SingleIssue :
-                         ~inst2_valid                    ? `SingleIssue : `DualIssue;     
-    assign launched = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
+    assign launch_mode   = br_bus1[32]                     ? `DualIssue   :
+                           (data_corelate | inst_conflict) ? `SingleIssue : 
+                           inst2_is_br                     ? `SingleIssue :
+                           ~inst2_valid                    ? `SingleIssue : `DualIssue;     
+    assign launched      = (inst1_valid | inst2_valid) & ~stallreq_for_cp0; // 这里要再考虑
 
     always@(*)begin
         if(rst | flush) begin
@@ -423,7 +421,7 @@ module ID(
     wire [`ID_INST_INFO-1:0] inst1_bus, inst2_bus;
     wire switch;
     
-    assign br_bus = br_bus1[32] & inst1_launch ? br_bus1[32:0] : 33'b0 ;
+    assign br_bus = (br_bus1[32] & inst1_launch) ? br_bus1[32:0] : 33'b0 ;
     assign switch = br_bus[32];
 
     assign inst1_bus = inst1_launch ?

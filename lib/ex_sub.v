@@ -32,10 +32,7 @@ module sub_ex(
     wire [7:0] mem_op;
     wire [`EXCEPT_WD-1:0] exceptinfo_i;
     wire [`EXCEPT_WD-1:0] exceptinfo_o;
-    wire is_inst_mfc0;
-    wire except_of_pc_addr;
-    wire adel;
-    wire ades;
+    wire [31:0] excepttype;
 
     assign {
         exceptinfo_i,   // 279:236
@@ -100,11 +97,11 @@ module sub_ex(
                           inst_sh | inst_lh | inst_lhu ? {{2{byte_sel[2]}},{2{byte_sel[0]}}} :
                           inst_sw | inst_lw ? 4'b1111 : 4'b0000;
 
-    assign data_sram_en    = flush | ades | except_of_pc_addr ? 1'b0 : data_ram_en;
-    assign data_sram_wen   = {4{data_ram_wen}}&data_ram_sel;
+    assign data_sram_en    = flush | (excepttype != `ZeroWord) ? 1'b0 : data_ram_en;
+    assign data_sram_wen   = {4{data_ram_wen}} & data_ram_sel;
     assign data_sram_addr  = ex_result;
     assign data_sram_wdata = inst_sb ? {4{rf_rdata2[7:0]}}  :
-                              inst_sh ? {2{rf_rdata2[15:0]}} : rf_rdata2;
+                             inst_sh ? {2{rf_rdata2[15:0]}} : rf_rdata2;
 
 // mul & div
     wire inst_mfhi, inst_mflo,  inst_mthi,  inst_mtlo;
@@ -242,32 +239,28 @@ module sub_ex(
 //except
     wire [31:0] alu_src2_mux;
     wire [32:0] result_sum;
-    wire [31:0] excepttype;
     wire ov_sum, ov;
+    wire adel, ades;
+    wire is_mfc0;
     wire int_overflow_pos;
     wire except_of_overflow;
     
-    assign is_inst_mfc0 = (exceptinfo_i[36:32]==5'b0) ? 1'b0 : 1'b1;
+    assign is_mfc0 = (exceptinfo_i[36:32]==5'b0) ? 1'b0 : 1'b1;
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
                               (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0010) |  
                               (inst[31:26]==6'b00_1000) ? 1'b1:1'b0;
 
     assign alu_src2_mux = alu_op[10] ? (~alu_src2)+1 : alu_src2;
     assign result_sum = alu_src1 + alu_src2_mux;
-    assign ov_sum = ((!alu_src1[31]&&!alu_src2_mux[31])&&result_sum[31]) ||
-                    ((alu_src1[31]&&alu_src2_mux[31])&&(!result_sum[31]));
+    assign ov_sum = ((!alu_src1[31] && !alu_src2_mux[31]) && result_sum[31]) || ((alu_src1[31] && alu_src2_mux[31]) && (!result_sum[31]));
 
     assign ov = ((int_overflow_pos==1'b1) && (ov_sum == 1'b1)) ? 1'b1 : 1'b0;
-    
-    assign except_of_pc_addr = (exceptinfo_i[31:0]==`LOADASSERT) ? 1'b1 : 1'b0;//这里可以简化
     assign adel = ((inst_lw && data_sram_addr[1:0] != 2'b0) || ((inst_lh||inst_lhu) && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
-    assign ades = ((inst_sw && data_sram_addr[1:0] != 2'b0) || (inst_sh && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0;
-
-    // assign exceptinfo_o = {exceptinfo_i[15:9], ades, adel, except_of_overflow, exceptinfo_i[5:0]};
+    assign ades = ((inst_sw && data_sram_addr[1:0] != 2'b0) || ( inst_sh            && data_sram_addr[0] != 1'b0)) ? 1'b1 : 1'b0; 
 
     assign excepttype = ov   && (exceptinfo_i[`PrioCode] < 4'h2) ? `OV          :
                         adel && (exceptinfo_i[`PrioCode] < 4'h1) ? `LOADASSERT  :
-                        ades && (exceptinfo_i[`PrioCode] < 4'h1) ? `STOREASSERT : exceptinfo_i[31:0];
+                        ades && (exceptinfo_i[`PrioCode] < 4'h1) ? `STOREASSERT : exceptinfo_i[31:0];// 这里要考虑例外优先级
     assign exceptinfo_o = {exceptinfo_i[43:32], excepttype};
 
 // output
@@ -290,7 +283,7 @@ module sub_ex(
     };
 
     assign ex_to_rf_bus = {
-        is_inst_mfc0,
+        is_mfc0,
         hilo_bus,
         rf_we,
         rf_waddr,

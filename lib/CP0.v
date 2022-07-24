@@ -37,12 +37,11 @@ module CP0(
     wire [4:0] waddr, raddr;
     wire [31:0] excepttype_i, excepttype;
     wire [`EXCEPT_WD-1:0] exceptinfo;
-    wire [7:0] interrupt;
 
-    assign except_happen = (exceptinfo_i1[31:0] | exceptinfo_i2[31:0]) != `ZeroWord ? 1'b1 :
+    assign except_happen = (exceptinfo_i1[31:0] | exceptinfo_i2[31:0]) != `ZeroWord            ? 1'b1 :
                            (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
 
-    assign caused_by_i1 = exceptinfo_i1[31:0]==`ZeroWord ? 1'b0 : 1'b1;//结合to be flushed使用
+    assign caused_by_i1 = exceptinfo_i1[31:0]==`ZeroWord ? 1'b0 : 1'b1;
     assign caused_by_i2 = exceptinfo_i2[31:0]==`ZeroWord ? 1'b0 : 1'b1;
 
     assign exceptinfo = caused_by_i2 ? exceptinfo_i2 : exceptinfo_i1;
@@ -58,8 +57,7 @@ module CP0(
         excepttype_i  // 31:0
     } = exceptinfo;
 
-    assign excepttype = (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ?
-                        `INTERRUPT : excepttype_i;
+    assign excepttype = (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? `INTERRUPT : excepttype_i;
 
     reg tick;
     always @ (posedge clk) begin
@@ -117,10 +115,8 @@ module CP0(
                 endcase
             end
 
-            // interrupt_happen <= (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
-
             if(except_happen) begin 
-                if (except_happen && status[1] == 1'b0) begin
+                if (~status[1]) begin
                     status[1] <= 1'b1;
                     cause[31] <= is_delayslot ? 1'b1 : 1'b0;
                     epc       <= is_delayslot ? current_pc-32'h4 : current_pc;
@@ -193,11 +189,9 @@ module CP0(
         end
     end
 
-    wire inst_eret;
-    assign inst_eret = (excepttype==`ERET) ? 1'b1 : 1'b0;
     assign o_rdata = cp0_rdata;
-    assign new_pc = inst_eret     ? epc[31:0]    :
-                    except_happen ? 32'hbfc00380 : `ZeroWord;
+    assign new_pc = excepttype==`ERET ? epc[31:0]    :
+                    except_happen     ? 32'hbfc00380 : `ZeroWord;
     assign to_be_flushed = except_happen;
 
 endmodule

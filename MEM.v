@@ -141,6 +141,7 @@ module MEM(
         .caused_by_i1   (caused_by_i1    ),
         .caused_by_i2   (caused_by_i2    )
     );
+    
     assign CP0_to_ctrl_bus = {to_be_flushed, new_pc};
 
 
@@ -151,27 +152,25 @@ module MEM(
                          exceptinfo_i_i1[36:32] != 5'b0 ? cp0_rdata     : ex_result_i1;
     assign rf_wdata_i2 = sel_rf_res_i2 & data_ram_en_i2 ? mem_result_i2 : ex_result_i2;
 
-    assign mem_to_wb_bus_i1 = inst1_valid ?
+    assign mem_to_wb_bus_i1 = (inst1_valid & ~caused_by_i1) ? //解决有写回要求的跳转指令延迟槽造成例外时flush导致跳转指令写回失败
     {
         hilo_bus_i1,   // 135:70
         mem_pc_i1,     // 69:38
         rf_we_i1,      // 37
         rf_waddr_i1,   // 36:32
         rf_wdata_i1    // 31:0
-    } : 136'b0;
+    } : `MEM_INST_INFO'b0;
 
-    assign mem_to_wb_bus_i2 = inst2_valid ?
+    assign mem_to_wb_bus_i2 = (inst2_valid & ~(caused_by_i1 | caused_by_i2)) ?
     {
         hilo_bus_i2,
         mem_pc_i2,
         rf_we_i2,
         rf_waddr_i2,
         rf_wdata_i2
-    } : 136'b0;
+    } : `MEM_INST_INFO'b0;
 
-    assign mem_to_wb_bus =  caused_by_i2  ? {`MEM_INST_INFO'b0, mem_to_wb_bus_i1} ://解决有写回要求的跳转指令延迟槽造成例外时flush导致跳转指令写回失败
-                            to_be_flushed ? {`MEM_INST_INFO'b0, `MEM_INST_INFO'b0} :
-                                            {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
+    assign mem_to_wb_bus = {mem_to_wb_bus_i2, mem_to_wb_bus_i1} ;
 
     assign mem_to_rf_bus = {
         hilo_bus_i2,

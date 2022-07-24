@@ -174,10 +174,10 @@ module decoder(
 
 //data select
     // rs to reg1
-    assign sel_alu_src1[0] = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
-                           | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_addi | inst_sub 
-                           | inst_and | inst_andi | inst_nor | inst_xori | inst_sllv | inst_srav | inst_srlv
-                           | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh;
+    assign sel_alu_src1[0] = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori   | inst_or   | inst_sw | inst_lw 
+                           | inst_xor | inst_sltu  | inst_slt  | inst_slti | inst_sltiu | inst_addi | inst_sub 
+                           | inst_and | inst_andi  | inst_nor  | inst_xori | inst_sllv  | inst_srav | inst_srlv
+                           | inst_lb  | inst_lbu   | inst_lh   | inst_lhu  | inst_sb    | inst_sh;
 
     // pc to reg1
     assign sel_alu_src1[1] = inst_jal | inst_bltzal | inst_bgezal | inst_jalr;
@@ -187,13 +187,13 @@ module decoder(
 
     
     // rt to reg2
-    assign sel_alu_src2[0] = inst_add | inst_addu | inst_subu | inst_sll | inst_or | inst_xor | inst_sltu | inst_slt
-                           | inst_sub | inst_and | inst_nor | inst_sllv | inst_sra | inst_srav | inst_srl | inst_srlv
+    assign sel_alu_src2[0] = inst_add | inst_addu | inst_subu | inst_sll  | inst_or  | inst_xor  | inst_sltu | inst_slt
+                           | inst_sub | inst_and  | inst_nor  | inst_sllv | inst_sra | inst_srav | inst_srl  | inst_srlv
                            | inst_mtc0;
     
     // imm_sign_extend to reg2
-    assign sel_alu_src2[1] = inst_lui | inst_addiu | inst_sw | inst_lw | inst_slti | inst_sltiu | inst_addi | inst_lb
-                           | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh;
+    assign sel_alu_src2[1] = inst_lui | inst_addiu | inst_sw  | inst_lw | inst_slti | inst_sltiu | inst_addi | inst_lb
+                           | inst_lbu | inst_lh    | inst_lhu | inst_sb | inst_sh;
 
     // 32'b8 to reg2
     assign sel_alu_src2[2] = inst_jal | inst_bltzal | inst_bgezal | inst_jalr;
@@ -318,14 +318,10 @@ module decoder(
     
     
 //except
-    wire delay_slot;
-    wire except_of_pc_addr;
-    wire adel;
-    wire ades;
-    wire except_of_overflow;
-    wire except_of_syscall;
-    wire except_of_break;
-    wire except_of_invalid_inst;
+    wire cp0_we, is_delayslot;
+    wire [4:0] waddr, raddr;
+    wire [31:0] excepttype;
+    wire [`EXCEPT_WD-1:0] except_info;
 
     assign inst_valid = inst_add  | inst_addi  | inst_addu   | inst_addiu|
                         inst_sub  | inst_subu  | inst_slt    | inst_slti |  
@@ -340,28 +336,10 @@ module decoder(
                         inst_mfhi | inst_mflo  | inst_mthi   | inst_mtlo |
                         inst_lb   | inst_lbu   | inst_lh     | inst_lhu  |
                         inst_lw   | inst_sb    | inst_sh     | inst_sw   |
-                        inst_break| inst_syscall|
-                        inst_eret | inst_mfc0  | inst_mtc0;
+                        inst_break| inst_eret  | inst_mfc0   | inst_mtc0 |
+                        inst_syscall;
 
-    assign stallreq_for_cp0       = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
-    assign delay_slot             = 1'b0;
-    assign except_of_pc_addr      = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
-    assign except_of_overflow     = 1'b0;
-    assign except_of_syscall      = inst_syscall;
-    assign except_of_break        = inst_break;
-    assign except_of_invalid_inst = ~inst_valid;
-
-    assign exceptinfo = {
-        inst[15:11],  delay_slot, except_of_pc_addr, 
-        adel,         ades,       except_of_overflow, 
-        inst_syscall, inst_break, except_of_invalid_inst,
-        inst_eret,    inst_mfc0,  inst_mtc0
-        };
-
-    wire cp0_we, is_delayslot;
-    wire [4:0] waddr, raddr;
-    wire [31:0] excepttype;
-    wire [`EXCEPT_WD-1:0] except_info;
+    assign stallreq_for_cp0 = (((ex_rf_we & (ex_rf_waddr == rs)) || (ex_rf_we & (ex_rf_waddr == rt))) && last_inst_is_mfc0) ? 1'b1 : 1'b0;
 
     assign cp0_we = inst_mtc0;
     assign is_delayslot = 1'b0;
@@ -381,6 +359,28 @@ module decoder(
         raddr,        // 36:32
         excepttype    // 31:0
     };
+
+    // wire delay_slot;
+    // wire except_of_pc_addr;
+    // wire adel;
+    // wire ades;
+    // wire except_of_overflow;
+    // wire except_of_syscall;
+    // wire except_of_break;
+    // wire except_of_invalid_inst;
+    
+    // assign delay_slot             = 1'b0;
+    // assign except_of_pc_addr      = (id_pc[1:0] == 2'b0) ? 1'b0:1'b1;
+    // assign except_of_overflow     = 1'b0;
+    // assign except_of_syscall      = inst_syscall;
+    // assign except_of_break        = inst_break;
+    // assign except_of_invalid_inst = ~inst_valid;
+    // assign exceptinfo = {
+    //     inst[15:11],  delay_slot, except_of_pc_addr, 
+    //     adel,         ades,       except_of_overflow, 
+    //     inst_syscall, inst_break, except_of_invalid_inst,
+    //     inst_eret,    inst_mfc0,  inst_mtc0
+    //     };
         
 //output
     assign inst_info = {
