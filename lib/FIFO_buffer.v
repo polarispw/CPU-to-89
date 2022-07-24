@@ -1,21 +1,11 @@
 `include "defines.vh"
 module Instbuffer(
-    input clk,
-    input rst,
-    input flush,
+    input wire clk,
+    input wire rst,
+    input wire flush,
     input [`STALLBUS_WD-1:0] stall,
-
-    // launch
-    input  wire issue_mode_i,                     //issue mode of issue stage
-    input  wire issue_i,                          //whether issue stage has issued inst
-    output wire [`InstBus] issue_inst1_o,         //inst 
-    output wire [`InstBus] issue_inst2_o,
-    output wire [`InstAddrBus] issue_inst1_addr_o,//pc
-    output wire [`InstAddrBus] issue_inst2_addr_o,
-    output wire [32:0] issue_bpu_predict_info_o,
-    output wire issue_inst1_valid_o,
-    output wire issue_inst2_valid_o,
-    output wire buffer_full_o,
+    input wire issue_mode_i,                     //issue mode of issue stage
+    input wire issue_i,                          //whether issue stage has issued inst
     
     // inst
     input wire [`InstBus] ICache_inst1_i,
@@ -24,9 +14,18 @@ module Instbuffer(
     input wire [`InstAddrBus] ICache_inst2_addr_i, 
     input wire ICache_inst1_valid_i,
     input wire ICache_inst2_valid_i,
-    input wire only_delayslot_inst_i,
     input wire [32:0] bpu_predict_info_i,
-    input wire bpu_select_i
+    input wire bpu_select_i,
+
+    // launch
+    output wire [`InstBus] issue_inst1_o, //inst 
+    output wire [`InstBus] issue_inst2_o,
+    output wire [`InstAddrBus] issue_inst1_addr_o, //pc
+    output wire [`InstAddrBus] issue_inst2_addr_o,
+    output wire issue_inst1_valid_o,
+    output wire issue_inst2_valid_o,
+    output wire buffer_full_o
+    // output wire [32:0] issue_bpu_predict_info_o,
 );
 
 // declare  
@@ -39,7 +38,7 @@ module Instbuffer(
     // ptr
     reg [`InstBufferSizeLog2-1:0] tail; //当前正在写入的数据位置
     reg [`InstBufferSizeLog2-1:0] head; //当前读取指令的首位置
-    reg [`InstBufferSize-1:0] FIFO_valid; //buffer中每个位置的数据是否有效（高电平有效）
+    reg [`InstBufferSize-1:0] FIFO_valid; //有效位（高电平有效）
     reg [`STALLBUS_WD-1:0] stall_r;
 
 // pop after launching
@@ -66,14 +65,14 @@ module Instbuffer(
             tail <= `InstBufferSizeLog2'h0;
         end
         else if(ICache_inst1_valid_i == `Valid && ICache_inst2_valid_i == `Invalid) begin
-            FIFO_data[tail] <= ICache_inst1_i;
-            FIFO_addr[tail] <= ICache_inst1_addr_i; //bpu_select_i ? {ICache_inst1_addr_i,33'd0} : {ICache_inst1_addr_i,bpu_predict_info_i};
+            FIFO_data[tail]  <= ICache_inst1_i;
+            FIFO_addr[tail]  <= ICache_inst1_addr_i; //bpu_select_i ? {ICache_inst1_addr_i,33'd0} : {ICache_inst1_addr_i,bpu_predict_info_i};
             FIFO_valid[tail] <= `Valid;
             tail <= tail + 1;
         end 
         else if(ICache_inst1_valid_i == `Invalid && ICache_inst2_valid_i == `Valid) begin
-            FIFO_data[tail] <= ICache_inst2_i;
-            FIFO_addr[tail] <= ICache_inst2_addr_i; //bpu_select_i ? {ICache_inst1_addr_i,33'd0} : {ICache_inst1_addr_i,bpu_predict_info_i};
+            FIFO_data[tail]  <= ICache_inst2_i;
+            FIFO_addr[tail]  <= ICache_inst2_addr_i; //bpu_select_i ? {ICache_inst1_addr_i,33'd0} : {ICache_inst1_addr_i,bpu_predict_info_i};
             FIFO_valid[tail] <= `Valid;
             tail <= tail + 1;
         end 
@@ -89,11 +88,11 @@ module Instbuffer(
     end	
 	   
 // output	
-	assign issue_inst1_o       = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_data[head]; 
-	assign issue_inst2_o       = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_data[head+`InstBufferSizeLog2'h1];
+	assign issue_inst1_o       = stall_r[2]&~stall_r[3] ? `ZeroWord : FIFO_data[head]; 
+	assign issue_inst2_o       = stall_r[2]&~stall_r[3] ? `ZeroWord : FIFO_data[head+`InstBufferSizeLog2'h1];
 	
-	assign issue_inst1_addr_o  = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_addr[head];
-	assign issue_inst2_addr_o  = stall_r[2]&~stall_r[3] ? 32'b0 : FIFO_addr[head+`InstBufferSizeLog2'h1];
+	assign issue_inst1_addr_o  = stall_r[2]&~stall_r[3] ? `ZeroWord : FIFO_addr[head];
+	assign issue_inst2_addr_o  = stall_r[2]&~stall_r[3] ? `ZeroWord : FIFO_addr[head+`InstBufferSizeLog2'h1];
 
     assign issue_inst1_valid_o = stall_r[2] ? 1'b0 : FIFO_valid[head];
     assign issue_inst2_valid_o = stall_r[2] ? 1'b0 : FIFO_valid[head+`InstBufferSizeLog2'h1];

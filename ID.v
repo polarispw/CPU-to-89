@@ -50,7 +50,6 @@ module ID(
     wire [31:0] inst1_pc, inst2_pc;
     wire [31:0] inst1_pc_o, inst2_pc_o;
     wire inst1_valid, inst2_valid;
-    wire out_valid;
     wire fifo_full;
 
     wire launched; 
@@ -77,10 +76,7 @@ module ID(
         else if(discard_current_inst & ~match_pc_en & (pc_to_match[1:0]==2'b0)) begin
             match_pc_en <= 1'b1;
         end
-    end
-
-    always @(posedge clk) begin
-        if(match_pc_en & matched) begin
+        else if(match_pc_en & matched) begin
             match_pc_en <= 1'b0;
             pc_to_match <= 32'b0;
         end
@@ -120,7 +116,7 @@ module ID(
         .ICache_inst2_addr_i  (inst2_in_pc       ),
         .ICache_inst1_valid_i (inst1_in_val      ),
         .ICache_inst2_valid_i (inst2_in_val      ),
-        .only_delayslot_inst_i(1'b0              ),
+
         .issue_inst1_o        (inst1             ),
         .issue_inst2_o        (inst2             ),
         .issue_inst1_addr_o   (inst1_pc_o        ),
@@ -266,8 +262,8 @@ module ID(
         .rdata2           (rdata2_i1           ), 
         .id_pc            (inst1_pc            ),
         .ex_rf_we         (ex_rf_we_i1         ),
-        .last_inst_is_mfc0(last_inst_is_mfc0_i1),
         .ex_rf_waddr      (ex_rf_waddr_i1      ),
+        .last_inst_is_mfc0(last_inst_is_mfc0_i1),
         .inst_info        (inst1_info_o        ),
         .br_bus           (br_bus1             ),
         .next_is_delayslot(inst1_is_br         ),
@@ -282,8 +278,8 @@ module ID(
         .rdata2           (rdata2_i2           ),
         .id_pc            (inst2_pc            ),
         .ex_rf_we         (ex_rf_we_i1         ),
-        .last_inst_is_mfc0(last_inst_is_mfc0_i1),
         .ex_rf_waddr      (ex_rf_waddr_i1      ),
+        .last_inst_is_mfc0(last_inst_is_mfc0_i1),
         .inst_info        (inst2_info_o        ),
         .br_bus           (br_bus2             ),
         .next_is_delayslot(inst2_is_br         ),
@@ -381,7 +377,7 @@ module ID(
 // launch check
 
     wire inst1_launch = inst1_valid & ~stallreq_for_cp0;
-    wire inst2_launch = inst2_valid & (launch_mode == `DualIssue) & ~stallreq_for_cp0;
+    wire inst2_launch = inst2_valid & ~stallreq_for_cp0 & (launch_mode == `DualIssue);
 
     assign sel_i1_src1 = inst1_info[15:13];
     assign sel_i2_src1 = inst2_info[15:13];
