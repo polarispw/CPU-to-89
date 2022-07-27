@@ -1,12 +1,15 @@
-`include "defines.vh"
-module sub_ex(
-    input wire rst,
+`include "lib/defines.vh"
+module EX(
     input wire clk,
+    input wire rst,
     input wire flush,
-    input wire [`ID_INST_INFO-1:0] inst_bus,
-
+    input wire [`StallBus-1:0] stall,
     output wire stallreq_for_ex,
-    output wire [`EX_INST_INFO-1:0] ex_to_mem_bus,
+
+    input wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
+
+    output wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
+
     output wire [`EX_TO_RF_WD-1:0] ex_to_rf_bus,
 
     output wire data_sram_en,
@@ -14,6 +17,23 @@ module sub_ex(
     output wire [31:0] data_sram_addr,
     output wire [31:0] data_sram_wdata
 );
+
+    reg [`ID_TO_EX_WD-1:0] id_to_ex_bus_r;
+
+    always @ (posedge clk) begin
+        if (rst) begin
+            id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
+        end
+        else if (flush) begin
+            id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
+        end
+        else if (stall[2]==`Stop && stall[3]==`NoStop) begin
+            id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
+        end
+        else if (stall[2]==`NoStop) begin
+            id_to_ex_bus_r <= id_to_ex_bus;
+        end
+    end
 
     wire [31:0] ex_pc, inst;
     wire [11:0] alu_op;
@@ -30,8 +50,8 @@ module sub_ex(
     wire [31:0] hi_i, lo_i;
     wire [7:0] hilo_op;
     wire [7:0] mem_op;
-    wire [`EXCEPT_WD-1:0] exceptinfo_i;
-    wire [`EXCEPT_WD-1:0] exceptinfo_o;
+    wire [`EXCEPT_WD:0] exceptinfo_i;
+    wire [`EXCEPT_WD:0] exceptinfo_o;
     wire [31:0] excepttype;
 
     assign {
@@ -49,9 +69,9 @@ module sub_ex(
         rf_we,          // 70
         rf_waddr,       // 69:65
         sel_rf_res,     // 64
-        rf_rdata2,      // 63:32
-        rf_rdata1       // 31:0
-    } = inst_bus;
+        rf_rdata1,      // 63:32
+        rf_rdata2       // 31:0
+    } = id_to_ex_bus_r;
 
 // alu
     wire [31:0] imm_sign_extend, imm_zero_extend, sa_zero_extend;
@@ -97,11 +117,11 @@ module sub_ex(
                           inst_sh | inst_lh | inst_lhu ? {{2{byte_sel[2]}},{2{byte_sel[0]}}} :
                           inst_sw | inst_lw ? 4'b1111 : 4'b0000;
 
-    assign data_sram_en    = flush | (excepttype != `ZeroWord) ? 1'b0 : data_ram_en;
-    assign data_sram_wen   = {4{data_ram_wen}} & data_ram_sel;
-    assign data_sram_addr  = ex_result;
-    assign data_sram_wdata = inst_sb ? {4{rf_rdata2[7:0]}}  :
-                             inst_sh ? {2{rf_rdata2[15:0]}} : rf_rdata2;
+    assign data_sram_en     = flush | (excepttype != `ZeroWord) ? 1'b0 : data_ram_en;
+    assign data_sram_wen    = {4{data_ram_wen}}&data_ram_sel;
+    assign data_sram_addr   = ex_result;
+    assign data_sram_wdata  = inst_sb ? {4{rf_rdata2[7:0]}} :
+                              inst_sh ? {2{rf_rdata2[15:0]}} : rf_rdata2;
 
 // mul & div
     wire inst_mfhi, inst_mflo,  inst_mthi,  inst_mtlo;
@@ -145,12 +165,12 @@ module sub_ex(
     	.rst          (rst          ),
         .clk          (clk          ),
         .signed_div_i (signed_div_o ),
-        .opdata1_i    (div_opdata1_o),
-        .opdata2_i    (div_opdata2_o),
-        .start_i      (div_start_o  ),
-        .annul_i      (1'b0         ),
-        .result_o     (div_result   ),
-        .ready_o      (div_ready_i  )
+        .opdata1_i    (div_opdata1_o    ),
+        .opdata2_i    (div_opdata2_o    ),
+        .start_i      (div_start_o      ),
+        .annul_i      (1'b0      ),
+        .result_o     (div_result     ),
+        .ready_o      (div_ready_i      )
     );
 
     always @ (*) begin
@@ -235,7 +255,11 @@ module sub_ex(
         hi_we, hi_o,
         lo_we, lo_o
     };
-   
+
+
+
+
+    
 //except
     wire [31:0] alu_src2_mux;
     wire [32:0] result_sum;

@@ -98,8 +98,8 @@ module uncache(
                         wr_addr <= conf_addr;
                         wr_data <= conf_wdata;
                         buffer_valid <= 1'b1;
-                        finish <= 1'b1;
-                        stage <= `WAIT;
+                        // finish <= 1'b1;
+                        // stage <= `WAIT;
                     end
                     else if (conf_wr_req & buffer_valid) begin
                         if (reload) begin

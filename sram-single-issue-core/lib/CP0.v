@@ -2,20 +2,14 @@
 module CP0(
     input wire rst,
     input wire clk,
-    input wire [`EXCEPT_WD-1:0] exceptinfo_i1,
-    input wire [`EXCEPT_WD-1:0] exceptinfo_i2,
-    input wire [31:0] current_pc_i1,
-    input wire [31:0] current_pc_i2,
-    input wire [31:0] rt_rdata_i1,
-    input wire [31:0] rt_rdata_i2,
-    input wire [31:0] bad_addr_i1,
-    input wire [31:0] bad_addr_i2,
+    input wire [`EXCEPT_WD:0] exceptinfo,
+    input wire [31:0] current_pc,
+    input wire [31:0] rt_rdata,
+    input wire [31:0] bad_addr,
 
     output wire [31:0] o_rdata,
     output wire [31:0] new_pc,
-    output wire to_be_flushed,
-    output wire caused_by_i1, 
-    output wire caused_by_i2
+    output wire to_be_flushed
 );
 
     reg [31:0] badvaddr;
@@ -28,26 +22,13 @@ module CP0(
     reg [31:0] cp0_rdata;
     reg interrupt_happen;
 
-    wire [31:0] current_pc;
-    wire [31:0] rt_rdata;
-    wire [31:0] bad_addr;
-   
     wire we_i, is_delayslot;
     wire except_happen;
     wire [4:0] waddr, raddr;
     wire [31:0] excepttype_i, excepttype;
-    wire [`EXCEPT_WD-1:0] exceptinfo;
 
-    assign except_happen = (exceptinfo_i1[31:0] | exceptinfo_i2[31:0]) != `ZeroWord            ? 1'b1 :
+    assign except_happen = (exceptinfo[31:0] != `ZeroWord) ? 1'b1 :
                            (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? 1'b1 : 1'b0;
-
-    assign caused_by_i1 = exceptinfo_i1[31:0]==`ZeroWord ? 1'b0 : 1'b1;
-    assign caused_by_i2 = exceptinfo_i2[31:0]==`ZeroWord ? 1'b0 : 1'b1;
-
-    assign exceptinfo = caused_by_i2 ? exceptinfo_i2 : exceptinfo_i1;
-    assign current_pc = caused_by_i2 ? current_pc_i2 : current_pc_i1;
-    assign rt_rdata   = rt_rdata_i1;
-    assign bad_addr   = caused_by_i2 ? rt_rdata_i2 : rt_rdata_i1;
 
     assign {
         is_delayslot, // 43
@@ -56,9 +37,8 @@ module CP0(
         raddr,        // 36:32
         excepttype_i  // 31:0
     } = exceptinfo;
-
     assign excepttype = (((cause[15:8] & status[15:8]) != 8'b0) && status[0] && ~status[1]) ? `INTERRUPT : excepttype_i;
-
+    
     reg tick;
     always @ (posedge clk) begin
         if (rst) begin

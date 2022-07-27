@@ -5,32 +5,27 @@ module CTRL(
     input wire stallreq_for_bru,
     input wire stallreq_for_load,
     input wire stallreq_for_cp0,
-    input wire stallreq_for_fifo,
-    input wire stallreq_for_cache,
     input wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus,
 
     output reg flush,
     output reg [31:0] new_pc,
-    output reg [`STALLBUS_WD-1:0] stall
+    output reg [`StallBus-1:0] stall
 );  
     always @ (*) begin
         if (rst | flush) begin
-            stall = `STALLBUS_WD'b0;
+            stall = `StallBus'b0;
         end
-        else if (stallreq_for_ex | stallreq_for_cache) begin
-            stall = `STALLBUS_WD'b111_101;
+        else if (stallreq_for_ex) begin
+            stall = `StallBus'b001111;
         end
         else if (stallreq_for_bru | stallreq_for_cp0) begin
-            stall = `STALLBUS_WD'b001_101;
+            stall = `StallBus'b000111;
         end
         else if (stallreq_for_load) begin
-            stall = `STALLBUS_WD'b000_101;
-        end
-        else if (stallreq_for_fifo) begin
-            stall = `STALLBUS_WD'b000_001;
+            stall = `StallBus'b000011;
         end
         else begin
-            stall = `STALLBUS_WD'b0;
+            stall = `StallBus'b0;
         end
     end
 
