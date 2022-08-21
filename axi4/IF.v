@@ -17,10 +17,10 @@ module IF(
     output wire [31:0] inst_sram_wdata
 );
 
-    reg ce_reg;                 // 是否取址
-    reg re_reg;
-    reg [31:0] pc_reg;
-    reg [31:0] pc_idef;         // 取回pc时用于对照
+    reg ce_reg; // 取址使能
+    reg re_reg; // 接收使能
+    reg [31:0] pc_reg;  // 访存pc 8字节对齐
+    reg [31:0] pc_idef; // 要接受的准确pc
 
     wire br_e;
     wire [31:0] next_pc;
@@ -37,7 +37,7 @@ module IF(
             pc_idef <= 32'hbfbf_fff8;
         end
         else if (stall[0]==`NoStop) begin
-            pc_reg <= {next_pc[31:3],3'b0};
+            pc_reg  <= {next_pc[31:3],3'b0};
             pc_idef <= next_pc;
         end
     end

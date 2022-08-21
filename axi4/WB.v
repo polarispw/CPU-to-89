@@ -32,10 +32,10 @@ module WB(
         if (rst) begin
             mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
         end
-        else if (stall[5]==`Stop) begin
+        else if (stall[6]==`Stop) begin
             mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
         end
-        else if (stall[5]==`NoStop) begin
+        else if (stall[6]==`NoStop) begin
             mem_to_wb_bus_r <= mem_to_wb_bus;
         end
     end

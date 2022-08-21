@@ -1,19 +1,19 @@
 //BUS BETWEEN MODULES
 `define IF_TO_ID_WD 65
-`define ID_TO_EX_WD 573
-`define EX_TO_MEM_WD 401
+`define ID_TO_EX_WD 585
+`define EX_TO_MEM_WD 413
 `define MEM_TO_WB_WD 272
 
-`define INST_INFO 93
-`define ID_INST_INFO 285
-`define EX_INST_INFO 199
+`define INST_INFO 99
+`define ID_INST_INFO 291
+`define EX_INST_INFO 205
 `define MEM_INST_INFO 136
 
 `define BR_WD 33
 `define CP0_TO_CTRL_WD 33
-`define STALLBUS_WD 6
+`define STALLBUS_WD 7
 `define EXCEPTINFO_WD 16
-`define EXCEPT_WD 44
+`define EXCEPT_WD 50
 
 `define EX_INFO_BACK 106
 `define MEM_INFO_BACK 104
@@ -42,18 +42,16 @@
 `define DivStop 1'b0
 
 // FIFO
-`define FIFOSize      32           
-`define FIFOSizebits  4            
-`define Valid         1'b1               
-`define Invalid       1'b0
-`define DualIssue     1'b1      
-`define SingleIssue   1'b0    
-`define InstBus       31:0
-`define InstAddrBus   31:0
-`define FIFOLine      16
-`define ZEROTAG       27'b0
-`define Lowbits       31:0
-`define Highbits      63:32
+`define FIFOSize           32           
+`define FIFOSizebits       5            
+`define Valid              1'b1               
+`define Invalid            1'b0
+`define DualIssue          1'b1      
+`define SingleIssue        1'b0               
+`define ValidPrediction    1'b1
+`define InValidPrediction  1'b0
+`define InstBus            31:0
+`define InstAddrBus        31:0
 
 // CP0
 `define ExcCode 6:2
@@ -70,9 +68,6 @@
 `define CP0_REG_ENTRYHI  5'b01010
 `define CP0_REG_INDEX    5'b00000
 `define INTERRUPT        32'h00000500
-`define Mod              32'h00000201
-`define TLBL             32'h00000202
-`define TLBS             32'h00000203
 `define LOADASSERT       32'h00000104
 `define PCASSERT         32'h00000404
 `define STOREASSERT      32'h00000105
@@ -82,6 +77,12 @@
 `define TRAP             32'h0000020d
 `define OV               32'h0000020c
 `define ERET             32'h0000050e
+`define TLBMOD           32'h00000501
+`define TLBLR            32'h00000502
+`define TLBSR            32'h00000503
+`define TLBLI            32'h00000512
+`define TLBSI            32'h00000513
+`define TLBmark          32'h00000014
 
 // cache
 `define TAG_WIDTH 21    // tag + v

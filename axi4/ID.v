@@ -5,26 +5,31 @@ module ID(
     input wire flush,
     input wire [`STALLBUS_WD-1:0] stall,
     input wire stallreq_for_cache,
-   
+
     input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
+    input wire i_refill,
+    input wire i_invalid,
+    input wire [31:0] tlbexc_pc,
     input wire [31:0] new_pc,
     input wire [63:0] inst_sram_rdata,
 
     input wire [`EX_TO_RF_WD-1:0]  ex_to_rf_bus,
+    input wire [`EX_TO_RF_WD-1:0]  dt_to_rf_bus,
     input wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
     input wire [`WB_TO_RF_WD-1:0]  wb_to_rf_bus,
 
     output wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
     output wire [`BR_WD-1:0] br_bus,
     output wire stallreq_for_load,
-    output wire stallreq_for_cp0,
+    output wire stallreq_for_excp0,
+    output wire stallreq_for_dtcp0,
     output wire stallreq_for_fifo
 );
 
 // IF to FIFO
 
     reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;
-  
+
     always @ (posedge clk) begin
         if (rst | flush) begin
             if_to_id_bus_r <= `IF_TO_ID_WD'b0;
@@ -44,14 +49,12 @@ module ID(
     wire [31:0] inst1_in_pc, inst2_in_pc;
     wire inst1_in_val, inst2_in_val;
 
-    wire re, discard_current_inst;
+    wire re;
     wire [31:0] inst_addr, pc_idef;
     wire matched, inst1_matched, inst2_matched;
     wire pc_adel;
-    reg [31:0] pc_to_match;
     reg [31:0] target_addr;
     reg check_pc;
-    reg match_pc_en;
 
     wire [31:0] inst1, inst2;
     wire [31:0] inst1_pc, inst2_pc;
@@ -63,8 +66,9 @@ module ID(
     wire inst1_is_br,inst2_is_br;
     wire br_e;
     wire [31:0] br_addr, br_target_addr;
+    wire empty_fifo;
     reg launch_r;
-    reg empty_fifo;
+    reg empty_r;
 
     assign {re, pc_idef, inst_addr} = if_to_id_bus_r;
     assign pc_adel = (pc_idef!=inst_addr) & (pc_idef!=inst_addr+32'd4);
@@ -101,7 +105,7 @@ module ID(
     assign inst1_matched = (check_pc & (inst1_in_pc!=target_addr)) ? 1'b0 : 1'b1;
     assign inst2_matched = (check_pc & (inst2_in_pc!=target_addr)) & 
                            (check_pc & (inst2_in_pc!=target_addr + 32'd4)) ? 1'b0 :1'b1;
-    
+
     assign inst1_in_val  = ~re            ? 1'b0 :
                            ~inst1_matched ? 1'b0 : 1'b1;
     assign inst2_in_val  = ~re            ? 1'b0 :
@@ -110,17 +114,21 @@ module ID(
     assign stallreq_for_fifo = fifo_full & ~br_bus[32]; // 队满时要发射的如果恰好是跳转则不能stall 要让IF取址(队列已留出冗余不会真的溢出)
     assign stop_pop = target_addr != `ZeroWord;
 
-    always @(posedge clk ) begin
+    always @(posedge clk) begin
         if(rst) begin
-            empty_fifo <= 1'b0;
+            empty_r <= 1'b0;
         end
-        else if(br_bus[32] | flush) begin
-            empty_fifo <= 1'b1;
+        else if(flush) begin
+            empty_r <= 1'b1;
+        end
+        else if(br_bus[32] ) begin
+            empty_r <= 1'b1;
         end
         else begin
-            empty_fifo <= 1'b0;
+            empty_r <= 1'b0;
         end
     end
+    assign empty_fifo = empty_r;
 
     Instbuffer FIFO_buffer(
         .clk           (clk               ),
@@ -143,34 +151,36 @@ module ID(
         .inst2_addr_o   (inst2_pc          ),
         .inst1_valid_o  (inst1_valid       ),
         .inst2_valid_o  (inst2_valid       ), 
-        // .br_target_addr (br_target_addr    ),        
+        // .br_target_addr (br_target_addr    ),
         .buffer_full_o  (fifo_full         )
     );
 
 
 // bypass and WB signal
 
-    wire ex_rf_we_i1, mem_rf_we_i1, wb_rf_we_i1;
-    wire ex_rf_we_i2, mem_rf_we_i2, wb_rf_we_i2;
-    wire [4:0]  ex_rf_waddr_i1, mem_rf_waddr_i1, wb_rf_waddr_i1;
-    wire [4:0]  ex_rf_waddr_i2, mem_rf_waddr_i2, wb_rf_waddr_i2;
-    wire [31:0] ex_rf_wdata_i1, mem_rf_wdata_i1, wb_rf_wdata_i1;
-    wire [31:0] ex_rf_wdata_i2, mem_rf_wdata_i2, wb_rf_wdata_i2;
+    wire ex_rf_we_i1, dt_rf_we_i1, mem_rf_we_i1, wb_rf_we_i1;
+    wire ex_rf_we_i2, dt_rf_we_i2, mem_rf_we_i2, wb_rf_we_i2;
+    wire [4:0]  ex_rf_waddr_i1, dt_rf_waddr_i1, mem_rf_waddr_i1, wb_rf_waddr_i1;
+    wire [4:0]  ex_rf_waddr_i2, dt_rf_waddr_i2, mem_rf_waddr_i2, wb_rf_waddr_i2;
+    wire [31:0] ex_rf_wdata_i1, dt_rf_wdata_i1, mem_rf_wdata_i1, wb_rf_wdata_i1;
+    wire [31:0] ex_rf_wdata_i2, dt_rf_wdata_i2, mem_rf_wdata_i2, wb_rf_wdata_i2;
 
-    wire ex_hi_we_i1, mem_hi_we_i1, wb_hi_we_i1;
-    wire ex_hi_we_i2, mem_hi_we_i2, wb_hi_we_i2;
-    wire ex_lo_we_i1, mem_lo_we_i1, wb_lo_we_i1;
-    wire ex_lo_we_i2, mem_lo_we_i2, wb_lo_we_i2;
-    wire [31:0] ex_hi_i1_i, mem_hi_i1_i, wb_hi_i1_i;
-    wire [31:0] ex_hi_i2_i, mem_hi_i2_i, wb_hi_i2_i;
-    wire [31:0] ex_lo_i1_i, mem_lo_i1_i, wb_lo_i1_i;
-    wire [31:0] ex_lo_i2_i, mem_lo_i2_i, wb_lo_i2_i;
-    wire last_inst_is_load_i1, last_inst_is_load_i2;
-    wire last_inst_is_mfc0_i1, last_inst_is_mfc0_i2;
+    wire ex_hi_we_i1, dt_hi_we_i1, mem_hi_we_i1, wb_hi_we_i1;
+    wire ex_hi_we_i2, dt_hi_we_i2, mem_hi_we_i2, wb_hi_we_i2;
+    wire ex_lo_we_i1, dt_lo_we_i1, mem_lo_we_i1, wb_lo_we_i1;
+    wire ex_lo_we_i2, dt_lo_we_i2, mem_lo_we_i2, wb_lo_we_i2;
+    wire [31:0] ex_hi_i1_i, dt_hi_i1_i, mem_hi_i1_i, wb_hi_i1_i;
+    wire [31:0] ex_hi_i2_i, dt_hi_i2_i, mem_hi_i2_i, wb_hi_i2_i;
+    wire [31:0] ex_lo_i1_i, dt_lo_i1_i, mem_lo_i1_i, wb_lo_i1_i;
+    wire [31:0] ex_lo_i2_i, dt_lo_i2_i, mem_lo_i2_i, wb_lo_i2_i;
+    wire ex_inst_is_load_i1, ex_inst_is_load_i2;
+    wire dt_inst_is_load_i1, dt_inst_is_load_i2;
+    wire ex_inst_is_cp0_i1, ex_inst_is_cp0_i2;
+    wire dt_inst_is_cp0_i1, dt_inst_is_cp0_i2;
     
     assign {
-        last_inst_is_load_i2,
-        last_inst_is_mfc0_i2,
+        ex_inst_is_load_i2,
+        ex_inst_is_cp0_i2,
         ex_hi_we_i2,
         ex_hi_i2_i,
         ex_lo_we_i2,
@@ -178,8 +188,8 @@ module ID(
         ex_rf_we_i2,
         ex_rf_waddr_i2,
         ex_rf_wdata_i2,
-        last_inst_is_load_i1,
-        last_inst_is_mfc0_i1,
+        ex_inst_is_load_i1,
+        ex_inst_is_cp0_i1,
         ex_hi_we_i1,
         ex_hi_i1_i,
         ex_lo_we_i1,
@@ -188,6 +198,26 @@ module ID(
         ex_rf_waddr_i1,
         ex_rf_wdata_i1
     } = ex_to_rf_bus;
+    assign {
+        dt_inst_is_load_i2,
+        dt_inst_is_cp0_i2,
+        dt_hi_we_i2,
+        dt_hi_i2_i,
+        dt_lo_we_i2,
+        dt_lo_i2_i,
+        dt_rf_we_i2,
+        dt_rf_waddr_i2,
+        dt_rf_wdata_i2,
+        dt_inst_is_load_i1,
+        dt_inst_is_cp0_i1,
+        dt_hi_we_i1,
+        dt_hi_i1_i,
+        dt_lo_we_i1,
+        dt_lo_i1_i,
+        dt_rf_we_i1,
+        dt_rf_waddr_i1,
+        dt_rf_wdata_i1
+    } = dt_to_rf_bus;
     assign {
         mem_hi_we_i2,
         mem_hi_i2_i,
@@ -224,11 +254,12 @@ module ID(
 
 // decode instruction
 
-    wire [`INST_INFO-1:0] inst1_info_o, inst2_info_o;
+    wire [`INST_INFO-1:0] inst1_info_o, inst2_info_o, inst2_info_temp;
     wire [`INST_INFO-1:0] inst1_info, inst2_info;
     wire [2:0] inst_flag1, inst_flag2;
     wire [4:0] rs_i1, rs_i2, rt_i1, rt_i2;
-    wire stallreq_for_cp0_i1, stallreq_for_cp0_i2;
+    wire stallreq_for_excp0_i1, stallreq_for_excp0_i2;
+    wire stallreq_for_dtcp0_i1, stallreq_for_dtcp0_i2;
     wire stallreq_for_load_i1, stallreq_for_load_i2;
 
     assign rs_i1 = inst1[25:21];
@@ -252,6 +283,8 @@ module ID(
     wire [31:0] hi_rdata, lo_rdata; 
     wire [32:0] br_bus1, br_bus2;
 
+    reg last_inst_is_tlbwi, last_inst_is_tlbr;
+
     decoder u1_decoder(
         .inst_sram_rdata  (inst1               ),
         .id_pc            (inst1_pc            ),
@@ -270,8 +303,30 @@ module ID(
         .inst_flag        (inst_flag2          )
     );
     
-    assign inst1_info = inst1_info_o; 
-    assign inst2_info = inst1_is_br ? {1'b1, inst2_info_o[91:0]} : inst2_info_o;
+    always @(posedge clk ) begin
+        if(rst) begin
+            last_inst_is_tlbwi <= 1'b0;
+            last_inst_is_tlbr  <= 1'b0;
+        end
+        else if(inst1_info_o[94]) begin
+            last_inst_is_tlbwi <= 1'b1;
+        end 
+        else if(inst1_info_o[95]) begin
+            last_inst_is_tlbr <= 1'b1;
+        end 
+        else begin
+            last_inst_is_tlbwi <= 1'b0;
+            last_inst_is_tlbr  <= 1'b0;
+        end
+    end
+
+    assign inst1_info = (last_inst_is_tlbwi | last_inst_is_tlbr) & inst1_info_o[80:49]==`ZeroWord ? {inst1_info_o[98:81], `TLBmark, inst1_info_o[48:0]} :
+                        (i_refill)  & (tlbexc_pc==inst1_pc) ? {inst1_info_o[98:81], `TLBLR, inst1_info_o[48:0]} : 
+                        (i_invalid) & (tlbexc_pc==inst1_pc) ? {inst1_info_o[98:81], `TLBLI, inst1_info_o[48:0]} : inst1_info_o; 
+
+    assign inst2_info_temp = (i_refill)  & (tlbexc_pc==inst2_pc) ? {inst2_info_o[98:81], `TLBLR, inst2_info_o[48:0]} : 
+                             (i_invalid) & (tlbexc_pc==inst2_pc) ? {inst2_info_o[98:81], `TLBLI, inst2_info_o[48:0]} : inst2_info_o; 
+    assign inst2_info = inst1_is_br ? {1'b1, inst2_info_temp[97:0]} : inst2_info_temp;
 
 
 // RW regfile
@@ -312,47 +367,59 @@ module ID(
 
 // bypass corelation
 
-    assign rdata1_i1 = (ex_rf_we_i1  & (ex_rf_waddr_i1  == rs_i1)) ? ex_rf_wdata_i1  :
-                       (ex_rf_we_i2  & (ex_rf_waddr_i2  == rs_i1)) ? ex_rf_wdata_i2  :
-                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rs_i1)) ? mem_rf_wdata_i1 :
+    assign rdata1_i1 = (ex_rf_we_i2  & (ex_rf_waddr_i2  == rs_i1)) ? ex_rf_wdata_i2  :
+                       (ex_rf_we_i1  & (ex_rf_waddr_i1  == rs_i1)) ? ex_rf_wdata_i1  :
+                       (dt_rf_we_i2  & (dt_rf_waddr_i2  == rs_i1)) ? dt_rf_wdata_i2  :
+                       (dt_rf_we_i1  & (dt_rf_waddr_i1  == rs_i1)) ? dt_rf_wdata_i1  :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rs_i1)) ? mem_rf_wdata_i2 :
-                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rs_i1)) ? wb_rf_wdata_i1  : 
-                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rs_i1)) ? wb_rf_wdata_i2  : rf_rdata1_i1;
+                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rs_i1)) ? mem_rf_wdata_i1 :
+                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rs_i1)) ? wb_rf_wdata_i2  : 
+                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rs_i1)) ? wb_rf_wdata_i1  : rf_rdata1_i1;
 
-    assign rdata2_i1 = (ex_rf_we_i1  & (ex_rf_waddr_i1  == rt_i1)) ? ex_rf_wdata_i1  :
-                       (ex_rf_we_i2  & (ex_rf_waddr_i2  == rt_i1)) ? ex_rf_wdata_i2  :
-                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rt_i1)) ? mem_rf_wdata_i1 :
+    assign rdata2_i1 = (ex_rf_we_i2  & (ex_rf_waddr_i2  == rt_i1)) ? ex_rf_wdata_i2  :
+                       (ex_rf_we_i1  & (ex_rf_waddr_i1  == rt_i1)) ? ex_rf_wdata_i1  :
+                       (dt_rf_we_i2  & (dt_rf_waddr_i2  == rt_i1)) ? dt_rf_wdata_i2  :
+                       (dt_rf_we_i1  & (dt_rf_waddr_i1  == rt_i1)) ? dt_rf_wdata_i1  :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rt_i1)) ? mem_rf_wdata_i2 :
-                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rt_i1)) ? wb_rf_wdata_i1  : 
-                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rt_i1)) ? wb_rf_wdata_i2  : rf_rdata2_i1;
+                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rt_i1)) ? mem_rf_wdata_i1 :
+                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rt_i1)) ? wb_rf_wdata_i2  : 
+                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rt_i1)) ? wb_rf_wdata_i1  : rf_rdata2_i1;
 
-    assign rdata1_i2 = (ex_rf_we_i1  & (ex_rf_waddr_i1  == rs_i2)) ? ex_rf_wdata_i1  :
-                       (ex_rf_we_i2  & (ex_rf_waddr_i2  == rs_i2)) ? ex_rf_wdata_i2  :
-                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rs_i2)) ? mem_rf_wdata_i1 :
+    assign rdata1_i2 = (ex_rf_we_i2  & (ex_rf_waddr_i2  == rs_i2)) ? ex_rf_wdata_i2  :
+                       (ex_rf_we_i1  & (ex_rf_waddr_i1  == rs_i2)) ? ex_rf_wdata_i1  :
+                       (dt_rf_we_i2  & (dt_rf_waddr_i2  == rs_i2)) ? dt_rf_wdata_i2  :
+                       (dt_rf_we_i1  & (dt_rf_waddr_i1  == rs_i2)) ? dt_rf_wdata_i1  :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rs_i2)) ? mem_rf_wdata_i2 :
-                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rs_i2)) ? wb_rf_wdata_i1  : 
-                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rs_i2)) ? wb_rf_wdata_i2  : rf_rdata1_i2;
+                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rs_i2)) ? mem_rf_wdata_i1 :
+                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rs_i2)) ? wb_rf_wdata_i2  : 
+                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rs_i2)) ? wb_rf_wdata_i1  : rf_rdata1_i2;
 
-    assign rdata2_i2 = (ex_rf_we_i1  & (ex_rf_waddr_i1  == rt_i2)) ? ex_rf_wdata_i1  :
-                       (ex_rf_we_i2  & (ex_rf_waddr_i2  == rt_i2)) ? ex_rf_wdata_i2  :
-                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rt_i2)) ? mem_rf_wdata_i1 :
+    assign rdata2_i2 = (ex_rf_we_i2  & (ex_rf_waddr_i2  == rt_i2)) ? ex_rf_wdata_i2  :
+                       (ex_rf_we_i1  & (ex_rf_waddr_i1  == rt_i2)) ? ex_rf_wdata_i1  :
+                       (dt_rf_we_i2  & (dt_rf_waddr_i2  == rt_i2)) ? dt_rf_wdata_i2  :
+                       (dt_rf_we_i1  & (dt_rf_waddr_i1  == rt_i2)) ? dt_rf_wdata_i1  :
                        (mem_rf_we_i2 & (mem_rf_waddr_i2 == rt_i2)) ? mem_rf_wdata_i2 :
-                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rt_i2)) ? wb_rf_wdata_i1  :
-                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rt_i2)) ? wb_rf_wdata_i2  : rf_rdata2_i2;
+                       (mem_rf_we_i1 & (mem_rf_waddr_i1 == rt_i2)) ? mem_rf_wdata_i1 :
+                       (wb_rf_we_i2  & (wb_rf_waddr_i2  == rt_i2)) ? wb_rf_wdata_i2  :
+                       (wb_rf_we_i1  & (wb_rf_waddr_i1  == rt_i2)) ? wb_rf_wdata_i1  : rf_rdata2_i2;
 
-    assign hi_rdata = ex_hi_we_i1  ? ex_hi_i1_i  :
-                      ex_hi_we_i2  ? ex_hi_i2_i  :
-                      mem_hi_we_i1 ? mem_hi_i1_i :
+    assign hi_rdata = ex_hi_we_i2  ? ex_hi_i2_i  :
+                      ex_hi_we_i1  ? ex_hi_i1_i  :
+                      dt_hi_we_i2  ? dt_hi_i2_i  :
+                      dt_hi_we_i1  ? dt_hi_i1_i  :
                       mem_hi_we_i2 ? mem_hi_i2_i :
-                      wb_hi_we_i1  ? wb_hi_i1_i  : 
-                      wb_hi_we_i2  ? wb_hi_i2_i  : hi_o;
+                      mem_hi_we_i1 ? mem_hi_i1_i :
+                      wb_hi_we_i2  ? wb_hi_i2_i  : 
+                      wb_hi_we_i1  ? wb_hi_i1_i  : hi_o;
 
-    assign lo_rdata = ex_lo_we_i1  ? ex_lo_i1_i  :
-                      ex_lo_we_i2  ? ex_lo_i2_i  :
-                      mem_lo_we_i1 ? mem_lo_i1_i :
+    assign lo_rdata = ex_lo_we_i2  ? ex_lo_i2_i  :
+                      ex_lo_we_i1  ? ex_lo_i1_i  :
+                      dt_lo_we_i2  ? dt_lo_i2_i  :
+                      dt_lo_we_i1  ? dt_lo_i1_i  :
                       mem_lo_we_i2 ? mem_lo_i2_i :
-                      wb_lo_we_i1  ? wb_lo_i1_i  :
-                      wb_lo_we_i2  ? wb_lo_i2_i  : lo_o;
+                      mem_lo_we_i1 ? mem_lo_i1_i :
+                      wb_lo_we_i2  ? wb_lo_i2_i  :
+                      wb_lo_we_i1  ? wb_lo_i1_i  : lo_o;
 
     wire [31:0] br_cls;
     wire [31:0] pc_plus_4;
@@ -391,7 +458,8 @@ module ID(
                      (br_cls==32'h0000_0009) ? {inst1_pc[31:28],inst1[25:0],2'b0} :
                      (br_cls==32'h0000_000a) ? rdata1_i1 :
                      (br_cls==32'h0000_000b) ? {inst1_pc[31:28],inst1[25:0],2'b0} :
-                     (br_cls==32'h0000_000c) ? rdata1_i1 : 32'b0;
+                     (br_cls==32'h0000_000c) ? rdata1_i1 : 
+                     (br_cls==32'h0000_000d) ? {inst1_pc[31:28],inst1[25:0],2'b0} : 32'b0;
 
 
 // launch check
@@ -399,17 +467,27 @@ module ID(
     wire inst1_launch, inst2_launch;
     wire [8:0] hilo_op_i1, hilo_op_i2;
 
-    assign stallreq_for_load_i1 = ((ex_rf_waddr_i1  == rs_i1) | (ex_rf_waddr_i1  == rt_i1)) & last_inst_is_load_i1
-                                | ((ex_rf_waddr_i2  == rs_i1) | (ex_rf_waddr_i2  == rt_i1)) & last_inst_is_load_i2;
-    assign stallreq_for_load_i2 = ((ex_rf_waddr_i1  == rs_i2) | (ex_rf_waddr_i1  == rt_i2)) & last_inst_is_load_i1
-                                | ((ex_rf_waddr_i2  == rs_i2) | (ex_rf_waddr_i2  == rt_i2)) & last_inst_is_load_i2;
-    assign stallreq_for_cp0_i1  = ((ex_rf_we_i1 & (ex_rf_waddr_i1 == rs_i1)) | (ex_rf_we_i1 & (ex_rf_waddr_i1 == rt_i1))) & last_inst_is_mfc0_i1;
-    assign stallreq_for_cp0_i2  = ((ex_rf_we_i1 & (ex_rf_waddr_i1 == rs_i2)) | (ex_rf_we_i1 & (ex_rf_waddr_i1 == rt_i2))) & last_inst_is_mfc0_i1;
+    assign stallreq_for_load_i1 = ((ex_rf_waddr_i1  == rs_i1) | (ex_rf_waddr_i1  == rt_i1)) & ex_inst_is_load_i1
+                                | ((ex_rf_waddr_i2  == rs_i1) | (ex_rf_waddr_i2  == rt_i1)) & ex_inst_is_load_i2
+                                | ((dt_rf_waddr_i1  == rs_i1) | (dt_rf_waddr_i1  == rt_i1)) & dt_inst_is_load_i1
+                                | ((dt_rf_waddr_i2  == rs_i1) | (dt_rf_waddr_i2  == rt_i1)) & dt_inst_is_load_i2;
 
-    assign stallreq_for_load = (stallreq_for_load_i1 & inst1_valid) |
-                               (stallreq_for_load_i2 & inst2_valid) ;
-    assign stallreq_for_cp0  = (stallreq_for_cp0_i1  & inst1_valid) | 
-                               (stallreq_for_cp0_i2  & inst2_valid) ;
+    assign stallreq_for_load_i2 = ((ex_rf_waddr_i1  == rs_i2) | (ex_rf_waddr_i1  == rt_i2)) & ex_inst_is_load_i1
+                                | ((ex_rf_waddr_i2  == rs_i2) | (ex_rf_waddr_i2  == rt_i2)) & ex_inst_is_load_i2
+                                | ((dt_rf_waddr_i1  == rs_i2) | (dt_rf_waddr_i1  == rt_i2)) & dt_inst_is_load_i1
+                                | ((dt_rf_waddr_i2  == rs_i2) | (dt_rf_waddr_i2  == rt_i2)) & dt_inst_is_load_i2;
+
+    assign stallreq_for_excp0_i1  = ((ex_rf_we_i1 & (ex_rf_waddr_i1 == rs_i1)) | (ex_rf_we_i1 & (ex_rf_waddr_i1 == rt_i1))) & ex_inst_is_cp0_i1;
+    assign stallreq_for_dtcp0_i1  = ((dt_rf_we_i1 & (dt_rf_waddr_i1 == rs_i1)) | (dt_rf_we_i1 & (dt_rf_waddr_i1 == rt_i1))) & dt_inst_is_cp0_i1;
+    assign stallreq_for_excp0_i2  = ((ex_rf_we_i1 & (ex_rf_waddr_i1 == rs_i2)) | (ex_rf_we_i1 & (ex_rf_waddr_i1 == rt_i2))) & ex_inst_is_cp0_i1;
+    assign stallreq_for_dtcp0_i2  = ((dt_rf_we_i1 & (dt_rf_waddr_i1 == rs_i2)) | (dt_rf_we_i1 & (dt_rf_waddr_i1 == rt_i2))) & dt_inst_is_cp0_i1;
+
+    assign stallreq_for_load   = (stallreq_for_load_i1 & inst1_valid) |
+                                 (stallreq_for_load_i2 & inst2_valid) ;
+    assign stallreq_for_excp0  = (stallreq_for_excp0_i1  & inst1_valid) | 
+                                 (stallreq_for_excp0_i2  & inst2_valid) ;
+    assign stallreq_for_dtcp0  = (stallreq_for_dtcp0_i1  & inst1_valid) | 
+                                 (stallreq_for_dtcp0_i2  & inst2_valid) ;
 
     assign sel_i1_src1 = inst1_info[15:13];
     assign sel_i2_src1 = inst2_info[15:13];
@@ -465,7 +543,7 @@ module ID(
 
     assign inst1_bus = inst1_launch ?
     {
-        inst1_info[92:28],// 284:220
+        inst1_info[98:28],// 290:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
         inst1_pc,         // 155:124
@@ -477,7 +555,7 @@ module ID(
 
     assign inst2_bus = inst2_launch ?
     {
-        inst2_info[92:28],// 284:220
+        inst2_info[98:28],// 290:220
         hi_rdata,         // 219:188
         lo_rdata,         // 187:156
         inst2_pc,         // 155:124
@@ -488,8 +566,14 @@ module ID(
     } : `ID_INST_INFO'b0;
 
     /*wire notes
-    is_delayslot,   // 284
-    we_i,           // 283
+    is_delayslot,   // 290
+    inst_cache,     // 289
+    inst_tlbp,      // 288
+    inst_tlbr,      // 287
+    inst_tlbwi,     // 286
+    inst_tlbwr,     // 285
+    inst_mfc0,      // 284
+    inst_mtc0,      // 283
     waddr,          // 282:279
     raddr,          // 278:273
     excepttype      // 272:241

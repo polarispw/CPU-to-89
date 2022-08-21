@@ -3,7 +3,6 @@ module ex_e(
     input wire rst,
     input wire clk,
     input wire [`ID_INST_INFO-1:0] inst_bus,
-    input wire [3:0] data_sram_sel,
 
     output wire [`EX_INST_INFO-1:0] ex_to_mem_bus,
     output wire [`EX_INFO_BACK-1:0] ex_to_rf_bus,
@@ -31,7 +30,7 @@ module ex_e(
     wire [31:0] excepttype;
 
     assign {
-        exceptinfo_i,   // 284:241
+        exceptinfo_i,   // 290:241
         mem_op,         // 240:229
         hilo_op,        // 228:220
         hi_i, lo_i,     // 219:156
@@ -90,7 +89,7 @@ module ex_e(
     
     assign data_sram_addr  = ex_result;
     assign data_sram_wdata = rf_rdata2;
-    assign byte_sel = data_sram_en ? data_sram_sel : 4'b0;
+    assign byte_sel = 4'b0;
 
 
 // hilo reg ralated
@@ -129,7 +128,7 @@ module ex_e(
     wire int_overflow_pos;
     wire except_of_overflow;
 
-    assign is_mfc0 = (exceptinfo_i[36:32]==5'b0) ? 1'b0 : 1'b1;
+    assign is_mfc0 = exceptinfo_i[43];
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
                               (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0010) |  
                               (inst[31:26]==6'b00_1000) ? 1'b1:1'b0;
@@ -146,7 +145,7 @@ module ex_e(
                         adel && (exceptinfo_i[`PrioCode] < 4'h1) ? `LOADASSERT  :
                         ades && (exceptinfo_i[`PrioCode] < 4'h1) ? `STOREASSERT : exceptinfo_i[31:0];// 这里要考虑例外优先级
 
-    assign exceptinfo_o = {exceptinfo_i[43:32], excepttype};
+    assign exceptinfo_o = {exceptinfo_i[49:32], excepttype};
 
 
 // output
@@ -155,8 +154,8 @@ module ex_e(
                        inst_mfhi ? hi_i : alu_result;
 
     assign ex_to_mem_bus = {
-        exceptinfo_o,   // 194:151    
-        mem_op,         // 150:143
+        exceptinfo_o,   // 204:155    
+        mem_op,         // 154:143
         hilo_bus,       // 142:77
         ex_pc,          // 76:45
         data_sram_en,   // 44

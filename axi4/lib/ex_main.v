@@ -3,7 +3,6 @@ module ex_p(
     input wire rst,
     input wire clk,
     input wire [`ID_INST_INFO-1:0] inst_bus,
-    input wire [3:0] data_sram_sel,
 
     output wire stallreq_for_ex,
     output wire [`EX_INST_INFO-1:0] ex_to_mem_bus,
@@ -14,7 +13,7 @@ module ex_p(
 );
 
     wire [31:0] ex_pc, inst;
-    wire [11:0] alu_op;
+    wire [11:0] alu_op_i, alu_op;
     wire [2:0] sel_alu_src1;
     wire [3:0] sel_alu_src2;
 
@@ -32,13 +31,13 @@ module ex_p(
     wire [31:0] excepttype;
 
     assign {
-        exceptinfo_i,   // 284:241
+        exceptinfo_i,   // 290:241
         mem_op,         // 240:229
         hilo_op,        // 228:220
         hi_i, lo_i,     // 219:156
         ex_pc,          // 155:124
         inst,           // 123:92
-        alu_op,         // 91:80 
+        alu_op_i,         // 91:80 
         sel_alu_src1,   // 79:77
         sel_alu_src2,   // 76:73
         data_sram_en,   // 72
@@ -52,10 +51,13 @@ module ex_p(
 
 
 // alu
+    wire inst_match;// aluop全1代表match指令
     wire [31:0] imm_sign_extend, imm_zero_extend, sa_zero_extend;
     assign imm_sign_extend = {{16{inst[15]}},inst[15:0]};
     assign imm_zero_extend = {16'b0, inst[15:0]};
     assign sa_zero_extend = {27'b0,inst[10:6]};
+
+    assign alu_op = inst_match==1'b1 ? 12'b0 : alu_op_i;
 
     wire [31:0] alu_src1, alu_src2;
     wire [31:0] alu_result, ex_result;
@@ -69,10 +71,21 @@ module ex_p(
                       sel_alu_src2[3] ? imm_zero_extend : rf_rdata2;
     
     alu u_alu(
-    	.alu_control (alu_op ),
+    	.alu_control (alu_op      ),
         .alu_src1    (alu_src1    ),
         .alu_src2    (alu_src2    ),
         .alu_result  (alu_result  )
+    );
+
+// match inst
+    assign inst_match = alu_op_i==12'b1111_1111_1111 ? 1'b1 : 1'b0;
+    wire [31:0] match_result;
+
+    match u_match(
+        .inst_match  (inst_match  ),
+        .rs_data     (alu_src1    ),
+        .rt_data     (alu_src2    ),
+        .match_result(match_result)
     );
 
 
@@ -91,7 +104,7 @@ module ex_p(
     
     assign data_sram_addr  = ex_result;
     assign data_sram_wdata = rf_rdata2;
-    assign byte_sel = data_sram_en ? data_sram_sel : 4'b0;
+    assign byte_sel = 4'b0;
 
 
 // mul & div
@@ -271,7 +284,7 @@ module ex_p(
     wire int_overflow_pos;
     wire except_of_overflow;
     
-    assign is_mfc0 = (exceptinfo_i[36:32]==5'b0) ? 1'b0 : 1'b1;
+    assign is_mfc0 = exceptinfo_i[43];
     assign int_overflow_pos = (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0000) |
                               (inst[31:26]==6'b0 && inst[10:6]==5'b0 && inst[5:0]==6'b10_0010) |  
                               (inst[31:26]==6'b00_1000) ? 1'b1:1'b0;
@@ -288,17 +301,18 @@ module ex_p(
                         adel && (exceptinfo_i[`PrioCode] < 4'h1) ? `LOADASSERT  :
                         ades && (exceptinfo_i[`PrioCode] < 4'h1) ? `STOREASSERT : exceptinfo_i[31:0];// 这里要考虑例外优先级
     
-    assign exceptinfo_o = {exceptinfo_i[43:32], excepttype};
+    assign exceptinfo_o = {exceptinfo_i[49:32], excepttype};
 
 
 // output
 
     assign ex_result = inst_mflo ? lo_i : 
                        inst_mfhi ? hi_i : 
-                       inst_mul  ? mul_result[31:0] : alu_result;
+                       inst_mul  ? mul_result[31:0] :
+                       inst_match? match_result : alu_result;
 
     assign ex_to_mem_bus = {
-        exceptinfo_o,   // 198:155    
+        exceptinfo_o,   // 204:155    
         mem_op,         // 154:143
         hilo_bus,       // 142:77
         ex_pc,          // 76:45

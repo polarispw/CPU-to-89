@@ -4,14 +4,28 @@ module MEM(
     input wire rst,
     input wire flush,
     input wire [`STALLBUS_WD-1:0] stall,
-    input wire [5:0] int,
 
-    input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
+    input wire [`EX_TO_MEM_WD-1:0] dt_to_mem_bus,
     input wire [31:0] data_sram_rdata_i,
 
+    input  wire caused_by_i1,
+    input  wire caused_by_i2,
+    input  wire [31:0] cp0_rdata,
+    output wire [`EXCEPT_WD-1:0] exceptinfo_i1,
+    output wire [`EXCEPT_WD-1:0] exceptinfo_i2,
+    output wire [31:0] current_pc_i1,
+    output wire [31:0] current_pc_i2,
+    output wire [31:0] rt_rdata_i1,
+    output wire [31:0] rt_rdata_i2,
+
+    output wire op_tlbp,
+    output wire op_tlbr,
+    output wire op_tlbwi,
+    output wire op_load,
+    output wire op_store,
+
     output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus,
-    output wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus,
-    output wire [`CP0_TO_CTRL_WD-1:0] CP0_to_ctrl_bus
+    output wire [`MEM_TO_RF_WD-1:0] mem_to_rf_bus
 );
 
     reg [`EX_TO_MEM_WD-1:0] ex_to_mem_bus_r;
@@ -20,11 +34,11 @@ module MEM(
         if (rst | flush) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
         end
-        else if (stall[4]==`Stop && stall[5]==`NoStop) begin
+        else if (stall[5]==`Stop && stall[6]==`NoStop) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
         end
-        else if (stall[4]==`NoStop) begin
-            ex_to_mem_bus_r <= ex_to_mem_bus;
+        else if (stall[5]==`NoStop) begin
+            ex_to_mem_bus_r <= dt_to_mem_bus;
         end
     end
 
@@ -45,21 +59,21 @@ module MEM(
     wire switch;
 
     assign {
-        switch,            // 400
-        inst2_valid,       // 399
-        inst1_valid,       // 398
-        exceptinfo_i_i2,   // 397:354
-        mem_op_i2,         // 353:342
-        hilo_bus_i2,       // 341:276
-        mem_pc_i2,         // 275:244
-        data_ram_en_i2,    // 243
-        data_ram_wen_i2,   // 242
-        data_ram_sel_i2,   // 241:238
-        sel_rf_res_i2,     // 237
-        rf_we_i2,          // 236
-        rf_waddr_i2,       // 235:231
-        ex_result_i2,      // 230:199
-        exceptinfo_i_i1,   // 198:155
+        switch,            // 412
+        inst2_valid,       // 411
+        inst1_valid,       // 410
+        exceptinfo_i_i2,   // 409:360
+        mem_op_i2,         // 359:348
+        hilo_bus_i2,       // 347:284
+        mem_pc_i2,         // 283:250
+        data_ram_en_i2,    // 249
+        data_ram_wen_i2,   // 248
+        data_ram_sel_i2,   // 247:244
+        sel_rf_res_i2,     // 243
+        rf_we_i2,          // 242
+        rf_waddr_i2,       // 241:237
+        ex_result_i2,      // 236:205
+        exceptinfo_i_i1,   // 204:155
         mem_op_i1,         // 154:143
         hilo_bus_i1,       // 142:77
         mem_pc_i1,         // 76:45
@@ -76,7 +90,7 @@ module MEM(
 // load data
 
     wire [31:0] data_sram_rdata;
-    reg [31:0] data_sram_r;
+    reg  [31:0] data_sram_r;
     reg stall_flag;
 
     always @(posedge clk ) begin
@@ -149,37 +163,25 @@ module MEM(
 
 
 // CP0
-    wire [31:0] cp0_rdata;
-    wire [31:0] new_pc;
-    wire to_be_flushed;
-    wire caused_by_i1, caused_by_i2;
+    assign exceptinfo_i1 = exceptinfo_i_i1;
+    assign exceptinfo_i2 = exceptinfo_i_i2;
+    assign current_pc_i1 = mem_pc_i1;
+    assign current_pc_i2 = mem_pc_i2;
+    assign rt_rdata_i1   = ex_result_i1;
+    assign rt_rdata_i2   = ex_result_i2;
 
-    CP0 u_CP0(
-        .rst            (rst             ),
-        .clk            (clk             ),
-        .int            (int             ),
-        .exceptinfo_i1  (exceptinfo_i_i1 ),
-        .exceptinfo_i2  (exceptinfo_i_i2 ),
-        .current_pc_i1  (mem_pc_i1       ),
-        .current_pc_i2  (mem_pc_i2       ),
-        .rt_rdata_i1    (ex_result_i1    ),
-        .rt_rdata_i2    (ex_result_i2    ),
-        
-        .o_rdata        (cp0_rdata       ),
-        .new_pc         (new_pc          ),
-        .to_be_flushed  (to_be_flushed   ),
-        .caused_by_i1   (caused_by_i1    ),
-        .caused_by_i2   (caused_by_i2    )
-    );
-    
-    assign CP0_to_ctrl_bus = {to_be_flushed, new_pc};
+    assign op_tlbp  = exceptinfo_i1[47];
+    assign op_tlbr  = exceptinfo_i1[46];
+    assign op_tlbwi = exceptinfo_i1[45];
 
+    assign op_load  = inst_lwl | inst_lwr | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw;
+    assign op_store = inst_sb  | inst_sh  | inst_sw | inst_swl | inst_swr;
 
 // output
     wire [`MEM_INST_INFO-1:0] mem_to_wb_bus_i1, mem_to_wb_bus_i2;
 
     assign rf_wdata_i1 = sel_rf_res_i1 & data_ram_en_i1 ? mem_result : 
-                         exceptinfo_i_i1[36:32] != 5'b0 ? cp0_rdata  : ex_result_i1;
+                         exceptinfo_i_i1[43] ? cp0_rdata  : ex_result_i1;
     assign rf_wdata_i2 = sel_rf_res_i2 & data_ram_en_i2 ? mem_result : ex_result_i2;
 
     assign mem_to_wb_bus_i1 = (inst1_valid & ~caused_by_i1) ? //解决有写回要求的跳转指令延迟槽造成例外时flush导致跳转指令写回失败
